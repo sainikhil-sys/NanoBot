@@ -21,49 +21,28 @@ interface LogEntry {
   message: string;
 }
 
-const SYSTEM_LOGS: LogEntry[] = [
-  {
-    id: "log-1",
-    timestamp: "10:32:14.204",
-    severity: "info",
-    component: "TaskClassifier",
-    message: "Intent classified: general_conversation with confidence 0.94. Selected Agent: NanoBot Core.",
-  },
-  {
-    id: "log-2",
-    timestamp: "10:32:14.250",
-    severity: "success",
-    component: "ModelRouter",
-    message: "Dispatched streaming inference to Groq neural gateway (llama-3.3-70b-versatile).",
-  },
-  {
-    id: "log-3",
-    timestamp: "10:31:02.118",
-    severity: "info",
-    component: "VectorStore",
-    message: "HNSW pgvector similarity scan completed. 4 chunks retrieved with mean score 0.892.",
-  },
-  {
-    id: "log-4",
-    timestamp: "10:30:45.890",
-    severity: "success",
-    component: "WorkflowEngine",
-    executionId: "exec-1786601844",
-    message: "Workflow 'Automated Document Research & Summarization' completed 5 nodes in 842ms.",
-  },
-  {
-    id: "log-5",
-    timestamp: "10:28:19.412",
-    severity: "warn",
-    component: "RateLimiter",
-    message: "Approaching 80% hourly token throughput limit on secondary OpenRouter gateway.",
-  },
-];
-
 export default function LogsPage() {
-  const [logs] = useState<LogEntry[]>(SYSTEM_LOGS);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState("all");
+
+  React.useEffect(() => {
+    async function loadLogs() {
+      try {
+        const res = await fetch("/api/logs");
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data.logs || []);
+        }
+      } catch (err) {
+        console.error("Failed to load logs:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLogs();
+  }, []);
 
   const filteredLogs = logs.filter((l) => {
     const matchSearch =
@@ -117,33 +96,46 @@ export default function LogsPage() {
           </div>
 
           <div className="divide-y divide-[#E5E7EB] font-mono text-xs">
-            {filteredLogs.map((log) => {
-              return (
-                <div key={log.id} className="p-3.5 flex items-start gap-3 hover:bg-[#FAFAFA] transition-colors">
-                  <span className="text-[#9CA3AF] shrink-0 text-[11px] pt-0.5">{log.timestamp}</span>
+            {loading ? (
+              <div className="p-12 text-center text-xs text-[#6B7280]">
+                Loading system logs...
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="p-16 text-center space-y-2">
+                <Scroll className="h-8 w-8 text-[#D1D5DB] mx-auto" />
+                <p className="text-xs text-[#6B7280] font-sans">
+                  No system logs recorded yet. Logs are generated when tasks, workflow executions, and AI queries run.
+                </p>
+              </div>
+            ) : (
+              filteredLogs.map((log) => {
+                return (
+                  <div key={log.id} className="p-3.5 flex items-start gap-3 hover:bg-[#FAFAFA] transition-colors">
+                    <span className="text-[#9CA3AF] shrink-0 text-[11px] pt-0.5">{log.timestamp}</span>
 
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold shrink-0 ${
-                      log.severity === "success"
-                        ? "bg-green-50 text-[#16A34A] border border-green-200"
-                        : log.severity === "warn"
-                        ? "bg-amber-50 text-amber-600 border border-amber-200"
-                        : log.severity === "error"
-                        ? "bg-red-50 text-red-600 border border-red-200"
-                        : "bg-blue-50 text-blue-600 border border-blue-200"
-                    }`}
-                  >
-                    {log.severity}
-                  </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold shrink-0 ${
+                        log.severity === "success"
+                          ? "bg-green-50 text-[#16A34A] border border-green-200"
+                          : log.severity === "warn"
+                          ? "bg-amber-50 text-amber-600 border border-amber-200"
+                          : log.severity === "error"
+                          ? "bg-red-50 text-red-600 border border-red-200"
+                          : "bg-blue-50 text-blue-600 border border-blue-200"
+                      }`}
+                    >
+                      {log.severity}
+                    </span>
 
-                  <span className="px-2 py-0.5 rounded bg-[#FAFAFA] border border-[#E5E7EB] text-black font-semibold shrink-0 text-[11px]">
-                    {log.component}
-                  </span>
+                    <span className="px-2 py-0.5 rounded bg-[#FAFAFA] border border-[#E5E7EB] text-black font-semibold shrink-0 text-[11px]">
+                      {log.component}
+                    </span>
 
-                  <span className="text-[#374151] flex-1 break-words">{log.message}</span>
-                </div>
-              );
-            })}
+                    <span className="text-[#374151] flex-1 break-words">{log.message}</span>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </main>

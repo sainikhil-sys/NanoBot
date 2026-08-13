@@ -132,7 +132,7 @@ export default function ProjectsPage() {
                   <span>Custom System Instructions</span>
                 </div>
                 <p className="text-[12px] font-mono text-neutral-700 truncate">
-                  "{proj.instructions}"
+                  &quot;{proj.instructions}&quot;
                 </p>
               </div>
 

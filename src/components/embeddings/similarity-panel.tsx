@@ -101,7 +101,7 @@ export function SimilarityPanel({
         </div>
       ) : (
         <div className="p-8 text-center text-xs text-neutral-400 font-sans border border-dashed border-[#EBEBEB] rounded-2xl">
-          Click "Compare" to compute true mathematical Cosine Similarity between Input A and Input B.
+          Click &quot;Compare&quot; to compute true mathematical Cosine Similarity between Input A and Input B.
         </div>
       )}
     </div>

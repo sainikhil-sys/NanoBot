@@ -48,7 +48,7 @@ export function TokenPreview({ text }: TokenPreviewProps) {
             >
               <div className="text-[9px] font-mono text-neutral-400">Token [{idx}]</div>
               <div className="text-[14px] font-mono font-bold text-black my-1 group-hover:text-blue-600 transition-colors">
-                "{token}"
+                &quot;{token}&quot;
               </div>
               <div className="text-[9px] font-mono text-neutral-500">
                 {token.length} chars
