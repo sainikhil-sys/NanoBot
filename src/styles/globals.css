@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --nanobot-green: #16A34A;
+    --nanobot-green-light: #EAF7EE;
+    --nanobot-green-soft: #F2FAF4;
+    --nanobot-black: #111111;
+    --nanobot-text: #1F2937;
+    --nanobot-muted: #6B7280;
+    --nanobot-border: #E5E7EB;
+    --nanobot-background: #FFFFFF;
+    --nanobot-surface: #FFFFFF;
+
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 97%;
+    --secondary-foreground: 0 0% 7%;
+    --muted: 0 0% 97%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 0 0% 7%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --nanobot-green: #16A34A;
+    --nanobot-green-light: #132E1D;
+    --nanobot-green-soft: #0E2417;
+    --nanobot-black: #0A0A0A;
+    --nanobot-text: #F3F4F6;
+    --nanobot-muted: #9CA3AF;
+    --nanobot-border: #27272A;
+    --nanobot-background: #09090B;
+    --nanobot-surface: #121215;
+
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 5% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 5% 12%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 16%;
+    --input: 240 6% 16%;
+    --ring: 240 5% 84%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-color: #FFFFFF;
+    color: #111111;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D1D5DB;
+}
+
+/* ─────────────────────── Infinite Marquee Animation ─────────────────────── */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-infinite {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 28s linear infinite;
+  will-change: transform;
+}
+
+.marquee-container:hover .animate-marquee-infinite {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee-infinite {
+    animation: none;
+    transform: none;
+  }
+}

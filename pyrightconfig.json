@@ -1,0 +1,12 @@
+{
+  "venvPath": "ml-service",
+  "venv": ".venv",
+  "extraPaths": [
+    "ml-service",
+    "ml-service/.venv/Lib/site-packages"
+  ],
+  "include": [
+    "ml-service"
+  ],
+  "reportMissingImports": false
+}
