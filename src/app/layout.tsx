@@ -18,10 +18,40 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const SITE_TITLE = "NanoBot — AI Agents, Knowledge & Workflow Automation";
+const SITE_DESCRIPTION =
+  "Build AI workflows that actually run. NanoBot connects models, knowledge, and real integrations into workflows you can build, execute, inspect, and control — with an assistant for your inbox, calendar, and tasks.";
+
 export const metadata: Metadata = {
-  title: "NanoBot — AI Agent Platform & Workflow Automation",
-  description:
-    "Production-grade AI agent platform, multi-bot orchestration system, visual workflow builder, and RAG knowledge workspace.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_TITLE, template: "%s · NanoBot" },
+  description: SITE_DESCRIPTION,
+  applicationName: "NanoBot",
+  keywords: [
+    "AI workflow automation",
+    "AI agents",
+    "RAG platform",
+    "LLM workflows",
+    "workflow builder",
+    "NLP platform",
+    "AI integrations",
+    "AI assistant",
+  ],
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "NanoBot",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({

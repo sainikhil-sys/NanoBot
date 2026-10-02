@@ -130,30 +130,28 @@ function HeroSection() {
       />
 
       <div className="relative z-10 flex flex-col items-center gap-6 px-6 max-w-5xl">
-        {/* Beta pill badge */}
+        {/* Pill badge */}
         <div>
           <div className="inline-flex items-center border border-[#EBEBEB] rounded-full px-3.5 py-1 text-xs text-neutral-500 bg-white/80 backdrop-blur-sm shadow-2xs font-sans">
-            Multi-Bot AI Orchestration · Now in Beta
+            AI agents · Knowledge · Workflow automation
           </div>
         </div>
 
         {/* Hero Title */}
         <h1
           className="leading-[0.95] font-medium tracking-tight text-black max-w-4xl font-sans"
-          style={{ fontSize: "clamp(52px, 8.5vw, 96px)" }}
+          style={{ fontSize: "clamp(48px, 8vw, 92px)" }}
         >
-          Workflows powered
+          Build AI workflows
           <br />
-          by <span className="italic font-serif">multi-bot</span>
-          <br />
-          and <span className="italic font-serif">AI.</span>
+          that <span className="italic font-serif">actually</span> run.
         </h1>
 
         {/* Subtitle */}
-        <p className="text-[18px] text-neutral-600 max-w-[500px] leading-[1.7] font-sans">
-          A unified orchestration platform where specialized deep-learning bots
-          work together to execute complex, multi-stage pipelines with full
-          transparency.
+        <p className="text-[18px] text-neutral-600 max-w-[560px] leading-[1.7] font-sans">
+          NanoBot connects models, your knowledge, and real integrations into
+          workflows you can build, execute, inspect, and control — with an
+          assistant for your inbox, calendar, and tasks alongside.
         </p>
 
         {/* CTA Buttons */}
@@ -162,14 +160,14 @@ function HeroSection() {
             href="/app/overview"
             className="inline-flex items-center justify-center transition-all duration-200 h-11 px-6 rounded-full bg-black text-white hover:bg-[#1A1A1A] text-sm font-medium tracking-tight shadow-xs gap-1.5"
           >
-            <span>Try NanoBot →</span>
+            <span>Open NanoBot →</span>
           </Link>
-          <a
-            href="#how"
+          <Link
+            href="/app/workflows"
             className="inline-flex items-center justify-center transition-all duration-200 h-11 px-6 rounded-full border border-[#EBEBEB] bg-white text-black hover:bg-neutral-50 text-sm font-medium tracking-tight"
           >
-            See how it works
-          </a>
+            Explore workflows
+          </Link>
         </div>
 
         {/* Interactive Search / Prompt Input Bar */}
@@ -202,16 +200,16 @@ function HeroSection() {
           </form>
         </div>
 
-        {/* Metric Badges */}
+        {/* Capability chips (honest — describe what the product does) */}
         <div className="flex gap-3 flex-wrap justify-center mt-2">
           <span className="text-xs text-neutral-500 border border-[#EBEBEB] rounded-full px-3 py-1 bg-white/80 backdrop-blur-sm font-mono">
-            7 specialized bots
+            Visual workflow builder
           </span>
           <span className="text-xs text-neutral-500 border border-[#EBEBEB] rounded-full px-3 py-1 bg-white/80 backdrop-blur-sm font-mono">
-            &lt;100ms latency
+            Run traces · retries · DLQ
           </span>
           <span className="text-xs text-neutral-500 border border-[#EBEBEB] rounded-full px-3 py-1 bg-white/80 backdrop-blur-sm font-mono">
-            100% deterministic DAGs
+            Human-in-the-loop
           </span>
         </div>
       </div>
@@ -975,7 +973,8 @@ function Footer() {
             <span className="font-semibold text-black">NanoBot</span>
           </div>
           <p className="text-neutral-500 leading-relaxed text-xs">
-            Multi-bot AI orchestration with transparent deep-learning pipelines.
+            AI agents, knowledge, and workflow automation — with an assistant for
+            your inbox, calendar, and tasks.
           </p>
         </div>
 
@@ -984,21 +983,22 @@ function Footer() {
             Platform
           </h4>
           <ul className="space-y-2 text-neutral-500 text-xs">
-            <li><Link href="/app/overview" className="hover:text-black transition-colors">Command Center</Link></li>
-            <li><Link href="/app/conversations" className="hover:text-black transition-colors">Conversations</Link></li>
-            <li><Link href="/app/network" className="hover:text-black transition-colors">Bot Network</Link></li>
-            <li><Link href="/app/tasks" className="hover:text-black transition-colors">Tasks History</Link></li>
+            <li><Link href="/app/overview" className="hover:text-black transition-colors">Overview</Link></li>
+            <li><Link href="/app/workflows" className="hover:text-black transition-colors">Workflows</Link></li>
+            <li><Link href="/app/automations" className="hover:text-black transition-colors">Automations</Link></li>
+            <li><Link href="/app/executions" className="hover:text-black transition-colors">Executions</Link></li>
           </ul>
         </div>
 
         <div>
           <h4 className="font-semibold text-black mb-3 text-xs uppercase tracking-wider font-mono">
-            Resources
+            Assistant
           </h4>
           <ul className="space-y-2 text-neutral-500 text-xs">
-            <li><Link href="/docs" className="hover:text-black transition-colors">Documentation</Link></li>
-            <li><Link href="/privacy" className="hover:text-black transition-colors">Privacy</Link></li>
-            <li><Link href="/terms" className="hover:text-black transition-colors">Terms of Service</Link></li>
+            <li><Link href="/app/inbox" className="hover:text-black transition-colors">Inbox</Link></li>
+            <li><Link href="/app/calendar" className="hover:text-black transition-colors">Calendar</Link></li>
+            <li><Link href="/app/knowledge" className="hover:text-black transition-colors">Knowledge</Link></li>
+            <li><Link href="/app/connected-accounts" className="hover:text-black transition-colors">Connected Accounts</Link></li>
           </ul>
         </div>
 
