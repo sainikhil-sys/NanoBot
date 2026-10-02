@@ -1,105 +1,80 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Automation, AutomationTriggerType } from "@/lib/workflows/types";
+import { WorkflowStore } from "@/lib/workflows/store";
+import { DEFAULT_WORKFLOWS } from "@/lib/workflows/seed";
+import { parseSchedule, computeNextRun } from "@/lib/automations/cron";
+import { DbService } from "@/lib/supabase/db-service";
 
-export interface AutomationRule {
-  id: string;
-  name: string;
-  description: string;
-  workflowId: string;
-  workflowName: string;
-  triggerType: "schedule" | "file_upload" | "webhook" | "event";
-  triggerConfig: string;
-  status: "active" | "paused";
-  createdAt: string;
-  lastRun?: string;
-  nextRun?: string;
-  executionCount: number;
-}
-
-const DEFAULT_AUTOMATIONS: AutomationRule[] = [
-  {
-    id: "auto-daily-news",
-    name: "Morning AI News & Research Crawler",
-    description: "Crawls AI research papers and synthesizes morning briefs at 9:00 AM daily.",
-    workflowId: "wf-web-monitor",
-    workflowName: "Daily AI Intelligence & News Brief",
-    triggerType: "schedule",
-    triggerConfig: "0 9 * * 1-5 (Weekdays at 9:00 AM)",
-    status: "active",
-    createdAt: new Date().toISOString(),
-    lastRun: "Today at 9:00 AM",
-    nextRun: "Tomorrow at 9:00 AM",
-    executionCount: 24,
-  },
-  {
-    id: "auto-pdf-ingest",
-    name: "Automated PDF Ingestion & Vector Indexing",
-    description: "Watches files directory and triggers document parser and vector embeddings upon upload.",
-    workflowId: "wf-doc-research",
-    workflowName: "Automated Document Research & Summarization",
-    triggerType: "file_upload",
-    triggerConfig: "*.pdf, *.docx, *.txt uploads",
-    status: "active",
-    createdAt: new Date().toISOString(),
-    lastRun: "2 hours ago",
-    nextRun: "On next file upload",
-    executionCount: 18,
-  },
-  {
-    id: "auto-github-webhook",
-    name: "Pull Request Code Quality & Security Audit",
-    description: "Listens for inbound webhooks and triggers static complexity and vulnerability heuristics.",
-    workflowId: "wf-doc-research",
-    workflowName: "Code Security & Complexity Analysis",
-    triggerType: "webhook",
-    triggerConfig: "POST /api/webhooks/github-pr",
-    status: "paused",
-    createdAt: new Date().toISOString(),
-    lastRun: "Yesterday at 4:30 PM",
-    nextRun: "Waiting for webhook event",
-    executionCount: 7,
-  },
-];
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __nanobotAutomationsList: AutomationRule[] | undefined;
-}
-
-if (!globalThis.__nanobotAutomationsList) {
-  globalThis.__nanobotAutomationsList = DEFAULT_AUTOMATIONS;
+function ensureWorkflowsSeeded() {
+  if (WorkflowStore.listWorkflows().length === 0) {
+    for (const def of DEFAULT_WORKFLOWS) WorkflowStore.publish(def);
+  }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    automations: globalThis.__nanobotAutomationsList || DEFAULT_AUTOMATIONS,
-  });
+  // No fabricated automations — the list is empty until the user creates one.
+  const automations = WorkflowStore.listAutomations();
+  return NextResponse.json({ automations });
 }
 
 export async function POST(req: NextRequest) {
   try {
+    ensureWorkflowsSeeded();
     const body = await req.json();
-    const newAutomation: AutomationRule = {
-      id: body.id || `auto-${Date.now()}`,
-      name: body.name || "Custom Automation",
+
+    if (!body.name || typeof body.name !== "string") {
+      return NextResponse.json({ error: "An automation 'name' is required." }, { status: 400 });
+    }
+    const workflow = WorkflowStore.getWorkflow(body.workflowId);
+    if (!workflow) {
+      return NextResponse.json(
+        { error: "A valid 'workflowId' is required to create an automation." },
+        { status: 400 }
+      );
+    }
+
+    const triggerType: AutomationTriggerType = body.triggerType || "manual";
+    let schedule: string | undefined;
+    let nextRunAt: string | undefined;
+
+    if (triggerType === "schedule") {
+      schedule = String(body.schedule || "");
+      const parsed = parseSchedule(schedule);
+      if (!parsed.valid) {
+        return NextResponse.json(
+          { error: `Invalid schedule "${schedule}". Use a cron expression or every:<n>m|h|d.` },
+          { status: 400 }
+        );
+      }
+      nextRunAt = computeNextRun(schedule) ?? undefined;
+    }
+
+    const userId = await DbService.getCurrentUserId().catch(() => undefined);
+    const now = new Date().toISOString();
+    const automation: Automation = {
+      id: `auto-${Date.now()}`,
+      userId,
+      name: body.name,
       description: body.description || "",
-      workflowId: body.workflowId || "wf-web-monitor",
-      workflowName: body.workflowName || "Daily AI Intelligence & News Brief",
-      triggerType: body.triggerType || "schedule",
-      triggerConfig: body.triggerConfig || "Manual trigger",
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      triggerType,
+      schedule,
+      timezone: body.timezone || "UTC",
+      retryPolicy: body.retryPolicy,
       status: "active",
-      createdAt: new Date().toISOString(),
-      lastRun: "Never",
-      nextRun: "Pending trigger",
+      createdAt: now,
+      updatedAt: now,
+      nextRunAt,
       executionCount: 0,
     };
 
-    if (!globalThis.__nanobotAutomationsList) {
-      globalThis.__nanobotAutomationsList = [];
-    }
-    globalThis.__nanobotAutomationsList.unshift(newAutomation);
-
-    return NextResponse.json({ automation: newAutomation });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Invalid automation configuration" }, { status: 400 });
+    WorkflowStore.saveAutomation(automation);
+    return NextResponse.json({ automation });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Invalid automation configuration" },
+      { status: 400 }
+    );
   }
 }

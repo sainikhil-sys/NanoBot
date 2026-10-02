@@ -99,6 +99,17 @@ export class DbService {
     return getStore().profile.user_id;
   }
 
+  /** Public accessor for the current authenticated user id (undefined if signed out). */
+  static async getCurrentUserId(): Promise<string | undefined> {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const userRes = await withTimeout(supabase.auth.getUser(), 1200);
+      return userRes?.data?.user?.id || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   // Profiles
   static async getCurrentProfile(): Promise<Profile> {
     const store = getStore();

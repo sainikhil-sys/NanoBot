@@ -1,53 +1,84 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import {
-  Lightning,
   Plus,
   Play,
   Clock,
   Broadcast,
   UploadSimple,
-  CheckCircle,
   Pause,
-  ArrowRight,
-  Sparkle,
+  Trash,
+  Lightning,
+  CheckCircle,
+  XCircle,
+  WarningCircle,
 } from "@phosphor-icons/react";
-import { AutomationRule } from "@/app/api/automations/route";
+import type { Automation, WorkflowDefinition, WorkflowExecutionRecord } from "@/lib/workflows/types";
+
+function relativeTime(iso?: string): string {
+  if (!iso) return "Never";
+  const diff = Date.now() - new Date(iso).getTime();
+  const abs = Math.abs(diff);
+  const mins = Math.round(abs / 60000);
+  if (mins < 1) return diff >= 0 ? "Just now" : "Momentarily";
+  if (mins < 60) return diff >= 0 ? `${mins}m ago` : `in ${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return diff >= 0 ? `${hrs}h ago` : `in ${hrs}h`;
+  const days = Math.round(hrs / 24);
+  return diff >= 0 ? `${days}d ago` : `in ${days}d`;
+}
 
 export default function AutomationsPage() {
-  const [automations, setAutomations] = useState<AutomationRule[]>([]);
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [lastRun, setLastRun] = useState<WorkflowExecutionRecord | null>(null);
+
+  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [triggerType, setTriggerType] = useState<"schedule" | "file_upload" | "webhook" | "event">("schedule");
-  const [triggerConfig, setTriggerConfig] = useState("0 9 * * 1-5 (Weekdays at 9:00 AM)");
-  const [runningId, setRunningId] = useState<string | null>(null);
+  const [workflowId, setWorkflowId] = useState("");
+  const [triggerType, setTriggerType] = useState<Automation["triggerType"]>("schedule");
+  const [schedule, setSchedule] = useState("0 9 * * 1-5");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const loadAutomations = async () => {
+  const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/automations");
-      if (res.ok) {
-        const data = await res.json();
-        setAutomations(data.automations || []);
+      setError(null);
+      const [aRes, wRes] = await Promise.all([fetch("/api/automations"), fetch("/api/workflows")]);
+      if (!aRes.ok) throw new Error("Failed to load automations");
+      const aData = await aRes.json();
+      setAutomations(aData.automations || []);
+      if (wRes.ok) {
+        const wData = await wRes.json();
+        setWorkflows(wData.workflows || []);
+        if (!workflowId && wData.workflows?.[0]) setWorkflowId(wData.workflows[0].id);
       }
     } catch (err) {
-      console.error("Failed to load automations:", err);
+      setError(err instanceof Error ? err.message : "Failed to load automations");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadAutomations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCreateAutomation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  useEffect(() => {
+    load();
+  }, [load]);
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    if (!name.trim()) return setFormError("Name is required.");
+    if (!workflowId) return setFormError("Select a workflow to run.");
+    setSubmitting(true);
     try {
       const res = await fetch("/api/automations", {
         method: "POST",
@@ -55,59 +86,82 @@ export default function AutomationsPage() {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
+          workflowId,
           triggerType,
-          triggerConfig,
-          workflowId: "wf-web-monitor",
-          workflowName: "Daily AI Intelligence & News Brief",
+          schedule: triggerType === "schedule" ? schedule.trim() : undefined,
         }),
       });
-
-      if (res.ok) {
-        setShowCreateModal(false);
-        setName("");
-        setDescription("");
-        loadAutomations();
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create automation");
+      setShowCreateModal(false);
+      setName("");
+      setDescription("");
+      await load();
     } catch (err) {
-      console.error("Automation creation error:", err);
+      setFormError(err instanceof Error ? err.message : "Failed to create automation");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleRunNow = async (id: string) => {
-    setRunningId(id);
-    // Simulate immediate trigger
-    setTimeout(() => {
-      setRunningId(null);
-      setAutomations((prev) =>
-        prev.map((a) =>
-          a.id === id
-            ? { ...a, lastRun: "Just now", executionCount: a.executionCount + 1 }
-            : a
-        )
-      );
-    }, 1200);
+    setBusyId(id);
+    setLastRun(null);
+    try {
+      const res = await fetch(`/api/automations/${id}/run`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setLastRun(data.execution || null);
+        await load();
+      } else {
+        setError(data.error || "Run failed");
+      }
+    } catch {
+      setError("Run failed");
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const handleToggleStatus = (id: string) => {
-    setAutomations((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, status: a.status === "active" ? "paused" : "active" }
-          : a
-      )
-    );
+  const handleToggle = async (a: Automation) => {
+    setBusyId(a.id);
+    try {
+      await fetch(`/api/automations/${a.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: a.status === "active" ? "paused" : "active" }),
+      });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
   };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this automation? This cannot be undone.")) return;
+    setBusyId(id);
+    try {
+      await fetch(`/api/automations/${id}`, { method: "DELETE" });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const activeCount = automations.filter((a) => a.status === "active").length;
+  const totalRuns = automations.reduce((acc, a) => acc + a.executionCount, 0);
 
   return (
     <div className="flex flex-col min-h-screen bg-white font-sans">
       <Header
-        title="Automations Engine"
-        description="Event-triggered and schedule-based autonomous AI pipelines"
+        title="Automations"
+        description="Bind triggers to workflows. Scheduled runs fire from the scheduler tick; every run is recorded."
         action={
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-black text-white hover:bg-[#1A1A1A] text-xs font-semibold shadow-2xs transition-colors"
+            disabled={workflows.length === 0}
+            className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-black text-white hover:bg-[#1A1A1A] text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
           >
             <Plus weight="bold" className="h-3.5 w-3.5 text-[#16A34A]" />
             <span>Create Automation</span>
@@ -116,133 +170,225 @@ export default function AutomationsPage() {
       />
 
       <main className="flex-1 p-6 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
-        {/* Metric Summary Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA]">
-            <div className="text-[11px] font-mono uppercase text-[#6B7280]">Active Schedules</div>
-            <div className="text-2xl font-bold text-black mt-1 font-mono">
-              {automations.filter((a) => a.status === "active").length}
-            </div>
+            <div className="text-[11px] font-mono uppercase text-[#6B7280]">Active Automations</div>
+            <div className="text-2xl font-bold text-black mt-1 font-mono">{activeCount}</div>
           </div>
           <div className="p-4 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA]">
-            <div className="text-[11px] font-mono uppercase text-[#6B7280]">Total Automated Runs</div>
-            <div className="text-2xl font-bold text-black mt-1 font-mono">
-              {automations.reduce((acc, a) => acc + a.executionCount, 0)}
-            </div>
+            <div className="text-[11px] font-mono uppercase text-[#6B7280]">Total Runs Recorded</div>
+            <div className="text-2xl font-bold text-black mt-1 font-mono">{totalRuns}</div>
           </div>
           <div className="p-4 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA]">
-            <div className="text-[11px] font-mono uppercase text-[#6B7280]">Pipeline Reliability</div>
-            <div className="text-2xl font-bold text-[#16A34A] mt-1 font-mono">100%</div>
+            <div className="text-[11px] font-mono uppercase text-[#6B7280]">Configured Automations</div>
+            <div className="text-2xl font-bold text-black mt-1 font-mono">{automations.length}</div>
           </div>
         </div>
 
-        {/* Automations List */}
-        <div className="space-y-4">
-          {automations.map((item) => {
-            const isSchedule = item.triggerType === "schedule";
-            const isFile = item.triggerType === "file_upload";
-            const isWebhook = item.triggerType === "webhook";
+        {error && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border border-red-200 bg-red-50 text-xs text-red-700">
+            <WarningCircle weight="bold" className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-            return (
-              <div
-                key={item.id}
-                className="p-5 rounded-2xl border border-[#E5E7EB] bg-white hover:border-black/30 transition-colors shadow-2xs space-y-4"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center text-black shrink-0">
-                      {isSchedule && <Clock weight="bold" className="h-4 w-4 text-[#16A34A]" />}
-                      {isFile && <UploadSimple weight="bold" className="h-4 w-4 text-blue-600" />}
-                      {isWebhook && <Broadcast weight="bold" className="h-4 w-4 text-purple-600" />}
+        {lastRun && (
+          <div
+            className={`flex items-center gap-2 p-3 rounded-xl border text-xs ${
+              lastRun.status === "completed"
+                ? "border-green-200 bg-green-50 text-green-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {lastRun.status === "completed" ? (
+              <CheckCircle weight="fill" className="h-4 w-4" />
+            ) : (
+              <XCircle weight="fill" className="h-4 w-4" />
+            )}
+            <span>
+              Run {lastRun.status} in {Math.round(lastRun.durationMs || 0)}ms.{" "}
+              <Link href="/app/executions" className="underline font-semibold">
+                View trace
+              </Link>
+            </span>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading ? (
+          <div className="space-y-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-28 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] animate-pulse" />
+            ))}
+          </div>
+        ) : automations.length === 0 ? (
+          /* Empty state */
+          <div className="p-12 text-center border border-dashed border-[#E5E7EB] rounded-2xl bg-[#FAFAFA]">
+            <div className="h-12 w-12 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center mx-auto mb-4">
+              <Lightning weight="bold" className="h-5 w-5 text-[#16A34A]" />
+            </div>
+            <h3 className="text-sm font-bold text-black">No automations yet</h3>
+            <p className="text-xs text-[#6B7280] mt-1 max-w-md mx-auto">
+              Create an automation to run one of your workflows on a schedule, a webhook, or on demand.
+              Nothing here is pre-populated — every run you see will be a real execution.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              disabled={workflows.length === 0}
+              className="mt-4 inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-black text-white hover:bg-[#1A1A1A] text-xs font-semibold disabled:opacity-50"
+            >
+              <Plus weight="bold" className="h-3.5 w-3.5 text-[#16A34A]" />
+              <span>Create your first automation</span>
+            </button>
+            {workflows.length === 0 && (
+              <p className="text-[11px] text-[#9CA3AF] mt-3">
+                Create a workflow first in the{" "}
+                <Link href="/app/workflows" className="underline">
+                  Workflows
+                </Link>{" "}
+                studio.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {automations.map((item) => {
+              const isSchedule = item.triggerType === "schedule";
+              const isFile = item.triggerType === "file_upload";
+              const isWebhook = item.triggerType === "webhook";
+              const busy = busyId === item.id;
+
+              return (
+                <div
+                  key={item.id}
+                  className="p-5 rounded-2xl border border-[#E5E7EB] bg-white hover:border-black/30 transition-colors shadow-2xs space-y-4"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center text-black shrink-0">
+                        {isSchedule && <Clock weight="bold" className="h-4 w-4 text-[#16A34A]" />}
+                        {isFile && <UploadSimple weight="bold" className="h-4 w-4 text-blue-600" />}
+                        {isWebhook && <Broadcast weight="bold" className="h-4 w-4 text-purple-600" />}
+                        {item.triggerType === "manual" && <Play weight="bold" className="h-4 w-4 text-black" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-black">{item.name}</h3>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase ${
+                              item.status === "active"
+                                ? "bg-green-50 text-[#16A34A] border border-green-200"
+                                : "bg-neutral-100 text-[#6B7280] border border-[#E5E7EB]"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                          {item.lastRunStatus && (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                                item.lastRunStatus === "completed"
+                                  ? "text-[#16A34A]"
+                                  : item.lastRunStatus === "failed"
+                                  ? "text-red-600"
+                                  : "text-[#6B7280]"
+                              }`}
+                            >
+                              last: {item.lastRunStatus}
+                            </span>
+                          )}
+                        </div>
+                        {item.description && <p className="text-xs text-[#6B7280] mt-0.5">{item.description}</p>}
+                      </div>
                     </div>
 
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRunNow(item.id)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-neutral-50 text-xs font-semibold text-black transition-colors shadow-2xs disabled:opacity-50"
+                      >
+                        {busy ? (
+                          <>
+                            <span className="h-2.5 w-2.5 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                            <span>Running…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play weight="fill" className="h-3 w-3 text-[#16A34A]" />
+                            <span>Run now</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(item)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-neutral-50 text-xs text-[#6B7280] hover:text-black transition-colors disabled:opacity-50"
+                      >
+                        {item.status === "active" ? (
+                          <>
+                            <Pause className="h-3 w-3" /> <span>Pause</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-3 w-3" /> <span>Resume</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={busy}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-[#E5E7EB] bg-white hover:bg-red-50 hover:border-red-200 text-[#6B7280] hover:text-red-600 transition-colors disabled:opacity-50"
+                        title="Delete automation"
+                      >
+                        <Trash className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[#E5E7EB] flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-mono text-[#6B7280]">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-black font-sans">{item.name}</h3>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase ${
-                            item.status === "active"
-                              ? "bg-green-50 text-[#16A34A] border border-green-200"
-                              : "bg-neutral-100 text-[#6B7280] border border-[#E5E7EB]"
-                          }`}
-                        >
-                          {item.status}
+                      <span className="text-[#9CA3AF]">Trigger:</span>{" "}
+                      <span className="text-black font-semibold">
+                        {isSchedule ? item.schedule : item.triggerType}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#9CA3AF]">Workflow:</span>{" "}
+                      <span className="text-black">{item.workflowName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#9CA3AF]">Runs:</span>{" "}
+                      <span className="text-black">{item.executionCount}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#9CA3AF]">Last:</span>{" "}
+                      <span className="text-black">{relativeTime(item.lastRunAt)}</span>
+                    </div>
+                    {isSchedule && (
+                      <div>
+                        <span className="text-[#9CA3AF]">Next:</span>{" "}
+                        <span className="text-[#16A34A]">
+                          {item.status === "active" ? relativeTime(item.nextRunAt) : "paused"}
                         </span>
                       </div>
-                      <p className="text-xs text-[#6B7280] mt-0.5 font-sans">{item.description}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleRunNow(item.id)}
-                      disabled={runningId === item.id}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-neutral-50 text-xs font-semibold text-black transition-colors shadow-2xs disabled:opacity-50"
-                    >
-                      {runningId === item.id ? (
-                        <>
-                          <span className="h-2.5 w-2.5 rounded-full border-2 border-black border-t-transparent animate-spin" />
-                          <span>Triggering...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play weight="fill" className="h-3 w-3 text-[#16A34A]" />
-                          <span>Trigger Now</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStatus(item.id)}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-neutral-50 text-xs text-[#6B7280] hover:text-black transition-colors"
-                    >
-                      {item.status === "active" ? (
-                        <>
-                          <Pause className="h-3 w-3" />
-                          <span>Pause</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-3 w-3" />
-                          <span>Resume</span>
-                        </>
-                      )}
-                    </button>
+                    )}
                   </div>
                 </div>
-
-                {/* Metadata Row */}
-                <div className="pt-3 border-t border-[#E5E7EB] flex flex-wrap items-center gap-4 text-xs font-mono text-[#6B7280]">
-                  <div>
-                    <span className="text-[#9CA3AF]">Trigger:</span>{" "}
-                    <span className="text-black font-semibold">{item.triggerConfig}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#9CA3AF]">Attached Workflow:</span>{" "}
-                    <span className="text-black">{item.workflowName}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#9CA3AF]">Last Run:</span>{" "}
-                    <span className="text-black">{item.lastRun || "Never"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#9CA3AF]">Next Trigger:</span>{" "}
-                    <span className="text-[#16A34A]">{item.nextRun || "N/A"}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Create Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
             <div className="w-full max-w-lg bg-white rounded-2xl border border-[#E5E7EB] p-6 shadow-2xl space-y-5">
               <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
-                <h3 className="text-base font-bold text-black">New Automation Rule</h3>
+                <h3 className="text-base font-bold text-black">New Automation</h3>
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
@@ -252,52 +398,71 @@ export default function AutomationsPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateAutomation} className="space-y-4">
+              <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-black">Automation Name</label>
+                  <label className="text-xs font-medium text-black">Name</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Daily Research Crawler"
+                    placeholder="e.g. Daily research brief"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full h-9 px-3 mt-1 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-xs text-black focus:outline-none focus:border-black"
                   />
                 </div>
-
                 <div>
                   <label className="text-xs font-medium text-black">Description</label>
                   <input
                     type="text"
-                    placeholder="Brief summary of automated action"
+                    placeholder="Optional summary"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full h-9 px-3 mt-1 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-xs text-black focus:outline-none focus:border-black"
                   />
                 </div>
-
                 <div>
-                  <label className="text-xs font-medium text-black">Trigger Mode</label>
+                  <label className="text-xs font-medium text-black">Workflow</label>
                   <select
-                    value={triggerType}
-                    onChange={(e: any) => setTriggerType(e.target.value)}
+                    value={workflowId}
+                    onChange={(e) => setWorkflowId(e.target.value)}
                     className="w-full h-9 px-3 mt-1 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-xs text-black focus:outline-none focus:border-black"
                   >
-                    <option value="schedule">Periodic Cron Schedule</option>
-                    <option value="file_upload">Document Upload Watcher</option>
-                    <option value="webhook">Inbound HTTP Webhook</option>
+                    {workflows.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
-
                 <div>
-                  <label className="text-xs font-medium text-black">Schedule / Config</label>
-                  <input
-                    type="text"
-                    value={triggerConfig}
-                    onChange={(e) => setTriggerConfig(e.target.value)}
-                    className="w-full h-9 px-3 mt-1 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-xs font-mono text-black focus:outline-none focus:border-black"
-                  />
+                  <label className="text-xs font-medium text-black">Trigger</label>
+                  <select
+                    value={triggerType}
+                    onChange={(e) => setTriggerType(e.target.value as Automation["triggerType"])}
+                    className="w-full h-9 px-3 mt-1 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-xs text-black focus:outline-none focus:border-black"
+                  >
+                    <option value="schedule">Schedule (cron / interval)</option>
+                    <option value="manual">Manual (run now only)</option>
+                    <option value="webhook">Webhook</option>
+                    <option value="file_upload">File upload</option>
+                  </select>
                 </div>
+                {triggerType === "schedule" && (
+                  <div>
+                    <label className="text-xs font-medium text-black">Schedule</label>
+                    <input
+                      type="text"
+                      value={schedule}
+                      onChange={(e) => setSchedule(e.target.value)}
+                      className="w-full h-9 px-3 mt-1 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] text-xs font-mono text-black focus:outline-none focus:border-black"
+                    />
+                    <p className="text-[10px] text-[#9CA3AF] mt-1 font-mono">
+                      Cron (e.g. 0 9 * * 1-5) or interval (e.g. every:30m, every:2h, every:1d)
+                    </p>
+                  </div>
+                )}
+
+                {formError && <p className="text-xs text-red-600">{formError}</p>}
 
                 <div className="pt-2 flex items-center justify-end gap-2">
                   <button
@@ -309,9 +474,10 @@ export default function AutomationsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 h-9 rounded-xl bg-black text-white hover:bg-neutral-900 text-xs font-semibold"
+                    disabled={submitting}
+                    className="px-4 h-9 rounded-xl bg-black text-white hover:bg-neutral-900 text-xs font-semibold disabled:opacity-50"
                   >
-                    Save Automation
+                    {submitting ? "Saving…" : "Save automation"}
                   </button>
                 </div>
               </form>
