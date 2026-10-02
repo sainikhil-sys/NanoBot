@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import {
   Robot,
   TreeStructure,
   Lightning,
+  Plugs,
   Books,
   Folder,
   Pulse,
@@ -58,6 +59,7 @@ const WORKSPACE_NAV_ITEMS: NavItem[] = [
   { title: "Agents", href: "/app/bots", icon: Robot },
   { title: "Workflows", href: "/app/workflows", icon: TreeStructure },
   { title: "Automations", href: "/app/automations", icon: Lightning },
+  { title: "Integrations", href: "/app/integrations", icon: Plugs },
   { title: "Knowledge", href: "/app/knowledge", icon: Books },
   { title: "Files", href: "/app/files", icon: Folder },
   { title: "Embeddings", href: "/app/embeddings", icon: Pulse },
@@ -329,3 +331,4 @@ export function Sidebar() {
     </>
   );
 }
+
