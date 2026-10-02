@@ -10,6 +10,10 @@ import {
   ClockCounterClockwise,
   BookmarkSimple,
   ArrowRight,
+  Sun,
+  EnvelopeSimple,
+  Calendar,
+  CheckSquare,
 } from "@phosphor-icons/react";
 
 interface FeatureCard {
@@ -22,41 +26,43 @@ interface FeatureCard {
 
 const FEATURES: FeatureCard[] = [
   {
+    title: "Daily AI Briefing",
+    description: "Get a prioritized morning overview of emails, meetings, and urgent tasks.",
+    href: "/app/overview",
+    badge: "Personal",
+    icon: Sun,
+  },
+  {
+    title: "Intelligent Inbox",
+    description: "Semantic email urgency scoring, action detection, and 1-click draft replies.",
+    href: "/app/inbox",
+    badge: "Gmail",
+    icon: EnvelopeSimple,
+  },
+  {
+    title: "Smart Calendar",
+    description: "AI schedule planning, free slot recommendation, and meeting prep notes.",
+    href: "/app/calendar",
+    badge: "Google",
+    icon: Calendar,
+  },
+  {
+    title: "Personal Tasks",
+    description: "Auto-extract action items from emails and chats with smart priority scoring.",
+    href: "/app/tasks",
+    icon: CheckSquare,
+  },
+  {
     title: "AI Search",
     description: "Search the web in real-time and get accurate AI-powered answers.",
     href: "/app/conversations",
-    badge: "New",
     icon: MagnifyingGlass,
-  },
-  {
-    title: "Upload Files",
-    description: "Upload documents, images, or PDFs and get instant insights.",
-    href: "/app/upload",
-    icon: UploadSimple,
   },
   {
     title: "Word to Vector",
     description: "Convert text or documents into vector embeddings.",
     href: "/app/embeddings",
     icon: Pulse,
-  },
-  {
-    title: "Remove Background",
-    description: "Remove image backgrounds instantly with AI.",
-    href: "/app/remove-bg",
-    icon: Scissors,
-  },
-  {
-    title: "History",
-    description: "View and manage your previous chats and searches.",
-    href: "/app/history",
-    icon: ClockCounterClockwise,
-  },
-  {
-    title: "Saved",
-    description: "Save important chats and results for quick access.",
-    href: "/app/saved",
-    icon: BookmarkSimple,
   },
 ];
 

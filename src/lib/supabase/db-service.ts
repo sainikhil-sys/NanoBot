@@ -10,6 +10,12 @@ import {
   Profile,
   SavedItem,
   VectorRecord,
+  PersonalTask,
+  PersonalMemory,
+  ConnectedAccount,
+  ApprovalRequest,
+  AuditLog,
+  DailyBriefing,
 } from "@/types/database.types";
 import { SYSTEM_BOTS, getBotById, getBotBySlug } from "@/lib/bots/registry";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -25,6 +31,12 @@ interface RuntimeStore {
   notifications: Map<string, AppNotification>;
   savedItems: Map<string, SavedItem>;
   vectors: Map<string, VectorRecord>;
+  personalTasks: Map<string, PersonalTask>;
+  personalMemory: Map<string, PersonalMemory>;
+  connectedAccounts: Map<string, ConnectedAccount>;
+  approvalRequests: Map<string, ApprovalRequest>;
+  auditLogs: Map<string, AuditLog>;
+  dailyBriefings: Map<string, DailyBriefing>;
   profile: Profile;
 }
 
@@ -61,6 +73,12 @@ function getStore(): RuntimeStore {
       notifications: new Map(),
       savedItems: new Map(),
       vectors: new Map(),
+      personalTasks: new Map(),
+      personalMemory: new Map(),
+      connectedAccounts: new Map(),
+      approvalRequests: new Map(),
+      auditLogs: new Map(),
+      dailyBriefings: new Map(),
       profile: {
         id: "usr-prod-001",
         user_id: "usr-prod-001",
@@ -73,18 +91,24 @@ function getStore(): RuntimeStore {
     };
   }
 
-  // Self-heal any properties if missing from previous hot-reload states
-  if (!globalThis.__nanobotStore.tasks) globalThis.__nanobotStore.tasks = new Map();
-  if (!globalThis.__nanobotStore.steps) globalThis.__nanobotStore.steps = new Map();
-  if (!globalThis.__nanobotStore.events) globalThis.__nanobotStore.events = new Map();
-  if (!globalThis.__nanobotStore.conversations) globalThis.__nanobotStore.conversations = new Map();
-  if (!globalThis.__nanobotStore.messages) globalThis.__nanobotStore.messages = new Map();
-  if (!globalThis.__nanobotStore.files) globalThis.__nanobotStore.files = new Map();
-  if (!globalThis.__nanobotStore.notifications) globalThis.__nanobotStore.notifications = new Map();
-  if (!globalThis.__nanobotStore.savedItems) globalThis.__nanobotStore.savedItems = new Map();
-  if (!globalThis.__nanobotStore.vectors) globalThis.__nanobotStore.vectors = new Map();
+  const s = globalThis.__nanobotStore;
+  if (!s.tasks) s.tasks = new Map();
+  if (!s.steps) s.steps = new Map();
+  if (!s.events) s.events = new Map();
+  if (!s.conversations) s.conversations = new Map();
+  if (!s.messages) s.messages = new Map();
+  if (!s.files) s.files = new Map();
+  if (!s.notifications) s.notifications = new Map();
+  if (!s.savedItems) s.savedItems = new Map();
+  if (!s.vectors) s.vectors = new Map();
+  if (!s.personalTasks) s.personalTasks = new Map();
+  if (!s.personalMemory) s.personalMemory = new Map();
+  if (!s.connectedAccounts) s.connectedAccounts = new Map();
+  if (!s.approvalRequests) s.approvalRequests = new Map();
+  if (!s.auditLogs) s.auditLogs = new Map();
+  if (!s.dailyBriefings) s.dailyBriefings = new Map();
 
-  return globalThis.__nanobotStore;
+  return s;
 }
 
 export class DbService {
@@ -869,5 +893,447 @@ export class DbService {
       saved: totalSaved,
       conversations: totalConvs,
     };
+  }
+
+  // ============================================================
+  // PERSONAL TASKS
+  // ============================================================
+  static async listPersonalTasks(userId?: string): Promise<PersonalTask[]> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("personal_tasks")
+          .select("*")
+          .eq("user_id", effectiveUserId)
+          .order("created_at", { ascending: false }),
+        1200
+      );
+
+      if (!error && data) {
+        data.forEach((t: PersonalTask) => store.personalTasks.set(t.id, t));
+        return data;
+      }
+    } catch {
+      // Fall through to store
+    }
+
+    return Array.from(store.personalTasks.values())
+      .filter((t) => t.user_id === effectiveUserId)
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  }
+
+  static async createPersonalTask(task: Omit<PersonalTask, "id" | "created_at" | "updated_at">): Promise<PersonalTask> {
+    const store = getStore();
+    const newTask: PersonalTask = {
+      ...task,
+      id: `ptask-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.personalTasks.set(newTask.id, newTask);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("personal_tasks").insert(newTask),
+        1200
+      );
+    } catch {
+      // Retained in memory store
+    }
+
+    return newTask;
+  }
+
+  static async updatePersonalTask(id: string, updates: Partial<PersonalTask>): Promise<PersonalTask | null> {
+    const store = getStore();
+    const existing = store.personalTasks.get(id);
+    if (!existing) return null;
+
+    const updated: PersonalTask = {
+      ...existing,
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+
+    store.personalTasks.set(id, updated);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("personal_tasks").update(updated).eq("id", id),
+        1200
+      );
+    } catch {
+      // Fall through
+    }
+
+    return updated;
+  }
+
+  static async deletePersonalTask(id: string): Promise<boolean> {
+    const store = getStore();
+    store.personalTasks.delete(id);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("personal_tasks").delete().eq("id", id),
+        1200
+      );
+    } catch {
+      // Fall through
+    }
+
+    return true;
+  }
+
+  // ============================================================
+  // PERSONAL MEMORY
+  // ============================================================
+  static async listPersonalMemory(userId?: string): Promise<PersonalMemory[]> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("personal_memory")
+          .select("*")
+          .eq("user_id", effectiveUserId)
+          .eq("is_disabled", false)
+          .order("created_at", { ascending: false }),
+        1200
+      );
+
+      if (!error && data) {
+        data.forEach((m: PersonalMemory) => store.personalMemory.set(m.id, m));
+        return data;
+      }
+    } catch {
+      // Fall through
+    }
+
+    return Array.from(store.personalMemory.values())
+      .filter((m) => m.user_id === effectiveUserId && !m.is_disabled)
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  }
+
+  static async createPersonalMemory(memory: Omit<PersonalMemory, "id" | "created_at" | "updated_at">): Promise<PersonalMemory> {
+    const store = getStore();
+    const newMemory: PersonalMemory = {
+      ...memory,
+      id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.personalMemory.set(newMemory.id, newMemory);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("personal_memory").insert(newMemory),
+        1200
+      );
+    } catch {
+      // Retained in memory store
+    }
+
+    return newMemory;
+  }
+
+  static async deletePersonalMemory(id: string): Promise<boolean> {
+    const store = getStore();
+    store.personalMemory.delete(id);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("personal_memory").delete().eq("id", id),
+        1200
+      );
+    } catch {
+      // Fall through
+    }
+
+    return true;
+  }
+
+  static async clearPersonalMemory(userId?: string): Promise<boolean> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    for (const [id, m] of store.personalMemory.entries()) {
+      if (m.user_id === effectiveUserId) {
+        store.personalMemory.delete(id);
+      }
+    }
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("personal_memory").delete().eq("user_id", effectiveUserId),
+        1200
+      );
+    } catch {
+      // Fall through
+    }
+
+    return true;
+  }
+
+  // ============================================================
+  // CONNECTED ACCOUNTS
+  // ============================================================
+  static async listConnectedAccounts(userId?: string): Promise<ConnectedAccount[]> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("connected_accounts")
+          .select("*")
+          .eq("user_id", effectiveUserId),
+        1200
+      );
+
+      if (!error && data) {
+        data.forEach((acc: ConnectedAccount) => store.connectedAccounts.set(acc.id, acc));
+        return data;
+      }
+    } catch {
+      // Fall through
+    }
+
+    return Array.from(store.connectedAccounts.values()).filter(
+      (acc) => acc.user_id === effectiveUserId
+    );
+  }
+
+  static async upsertConnectedAccount(account: Omit<ConnectedAccount, "id" | "created_at" | "updated_at">): Promise<ConnectedAccount> {
+    const store = getStore();
+    // Check if account already exists for this provider
+    const existing = Array.from(store.connectedAccounts.values()).find(
+      (a) => a.user_id === account.user_id && a.provider === account.provider
+    );
+
+    const saved: ConnectedAccount = {
+      ...account,
+      id: existing ? existing.id : `acc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: existing ? existing.created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.connectedAccounts.set(saved.id, saved);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("connected_accounts").upsert(saved, { onConflict: "user_id,provider" }),
+        1200
+      );
+    } catch {
+      // Retained in memory
+    }
+
+    return saved;
+  }
+
+  static async deleteConnectedAccount(provider: string, userId?: string): Promise<boolean> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    for (const [id, acc] of store.connectedAccounts.entries()) {
+      if (acc.user_id === effectiveUserId && acc.provider === provider) {
+        store.connectedAccounts.delete(id);
+      }
+    }
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("connected_accounts").delete().eq("user_id", effectiveUserId).eq("provider", provider),
+        1200
+      );
+    } catch {
+      // Fall through
+    }
+
+    return true;
+  }
+
+  // ============================================================
+  // APPROVAL REQUESTS
+  // ============================================================
+  static async listApprovalRequests(userId?: string): Promise<ApprovalRequest[]> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("approval_requests")
+          .select("*")
+          .eq("user_id", effectiveUserId)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false }),
+        1200
+      );
+
+      if (!error && data) {
+        data.forEach((r: ApprovalRequest) => store.approvalRequests.set(r.id, r));
+        return data;
+      }
+    } catch {
+      // Fall through
+    }
+
+    return Array.from(store.approvalRequests.values()).filter(
+      (r) => r.user_id === effectiveUserId && r.status === "pending"
+    );
+  }
+
+  static async createApprovalRequest(request: Omit<ApprovalRequest, "id" | "created_at" | "updated_at">): Promise<ApprovalRequest> {
+    const store = getStore();
+    const newReq: ApprovalRequest = {
+      ...request,
+      id: `appr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.approvalRequests.set(newReq.id, newReq);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("approval_requests").insert(newReq),
+        1200
+      );
+    } catch {
+      // Retained in memory
+    }
+
+    return newReq;
+  }
+
+  static async updateApprovalRequestStatus(id: string, status: "approved" | "rejected" | "expired"): Promise<ApprovalRequest | null> {
+    const store = getStore();
+    const existing = store.approvalRequests.get(id);
+    if (!existing) return null;
+
+    const updated: ApprovalRequest = {
+      ...existing,
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    store.approvalRequests.set(id, updated);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("approval_requests").update({ status, updated_at: updated.updated_at }).eq("id", id),
+        1200
+      );
+    } catch {
+      // Fall through
+    }
+
+    return updated;
+  }
+
+  // ============================================================
+  // AUDIT LOGS
+  // ============================================================
+  static async createAuditLog(log: Omit<AuditLog, "id" | "created_at">): Promise<AuditLog> {
+    const store = getStore();
+    const newLog: AuditLog = {
+      ...log,
+      id: `aud-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+    };
+
+    store.auditLogs.set(newLog.id, newLog);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("audit_logs").insert(newLog),
+        1200
+      );
+    } catch {
+      // Retained in memory
+    }
+
+    return newLog;
+  }
+
+  // ============================================================
+  // DAILY BRIEFINGS
+  // ============================================================
+  static async getLatestDailyBriefing(userId?: string): Promise<DailyBriefing | null> {
+    const store = getStore();
+    const effectiveUserId = userId || store.profile.user_id;
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await withTimeout(
+        supabase
+          .from("daily_briefings")
+          .select("*")
+          .eq("user_id", effectiveUserId)
+          .order("date", { ascending: false })
+          .limit(1)
+          .single(),
+        1200
+      );
+
+      if (!error && data) {
+        store.dailyBriefings.set(data.id, data);
+        return data;
+      }
+    } catch {
+      // Fall through
+    }
+
+    const briefings = Array.from(store.dailyBriefings.values()).filter(
+      (b) => b.user_id === effectiveUserId
+    );
+
+    return briefings.length > 0 ? briefings[briefings.length - 1] : null;
+  }
+
+  static async saveDailyBriefing(briefing: Omit<DailyBriefing, "id" | "created_at">): Promise<DailyBriefing> {
+    const store = getStore();
+    const newBriefing: DailyBriefing = {
+      ...briefing,
+      id: `brf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+    };
+
+    store.dailyBriefings.set(newBriefing.id, newBriefing);
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      await withTimeout(
+        supabase.from("daily_briefings").upsert(newBriefing, { onConflict: "user_id,date" }),
+        1200
+      );
+    } catch {
+      // Retained in memory
+    }
+
+    return newBriefing;
   }
 }

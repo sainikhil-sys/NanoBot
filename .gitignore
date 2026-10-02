@@ -1,8 +1,11 @@
-node_modules
-
+node_modules/
 .next/
-
-.env.local
 .env
+.env.local
 __pycache__/
 *.pyc
+*.log
+*.tsbuildinfo
+
+.vercel
+.env*

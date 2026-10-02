@@ -23,6 +23,14 @@ import {
   CaretDown,
   X,
   List,
+  EnvelopeSimple,
+  Calendar,
+  CheckSquare,
+  HardDrives,
+  LinkedinLogo,
+  Sun,
+  Brain,
+  LinkSimpleHorizontal,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { UpgradeModal } from "./upgrade-modal";
@@ -34,8 +42,18 @@ interface NavItem {
   badge?: string;
 }
 
+const PERSONAL_NAV_ITEMS: NavItem[] = [
+  { title: "Daily Briefing", href: "/app/overview", icon: Sun },
+  { title: "Inbox", href: "/app/inbox", icon: EnvelopeSimple },
+  { title: "Calendar", href: "/app/calendar", icon: Calendar },
+  { title: "Tasks", href: "/app/tasks", icon: CheckSquare },
+  { title: "Drive", href: "/app/drive", icon: HardDrives },
+  { title: "LinkedIn", href: "/app/linkedin", icon: LinkedinLogo },
+  { title: "Memory", href: "/app/memory", icon: Brain },
+  { title: "Connected Accounts", href: "/app/connected-accounts", icon: LinkSimpleHorizontal },
+];
+
 const WORKSPACE_NAV_ITEMS: NavItem[] = [
-  { title: "Overview", href: "/app/overview", icon: Sparkle },
   { title: "AI Search", href: "/app/conversations", icon: MagnifyingGlass },
   { title: "Agents", href: "/app/bots", icon: Robot },
   { title: "Workflows", href: "/app/workflows", icon: TreeStructure },
@@ -170,8 +188,16 @@ export function Sidebar() {
 
         {/* Scrollable Navigation Groups */}
         <div className="px-3 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
-          {/* 1. Workspace Section */}
+          {/* 1. Personal Section */}
           <div className="space-y-1">
+            <div className="px-3 text-[10px] font-mono uppercase tracking-wider text-[#9CA3AF] font-semibold">
+              Personal
+            </div>
+            {renderNavList(PERSONAL_NAV_ITEMS)}
+          </div>
+
+          {/* 2. Workspace Section */}
+          <div className="space-y-1 pt-1 border-t border-[#F3F4F6]">
             <div className="px-3 text-[10px] font-mono uppercase tracking-wider text-[#9CA3AF] font-semibold">
               Workspace
             </div>

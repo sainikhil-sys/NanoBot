@@ -22,13 +22,24 @@ export default function SignUpPage() {
       const urlError = params.get("error");
       const urlDesc = params.get("error_description");
 
-      if (urlError) {
-        if (urlError === "OAuthFailed" || urlError === "redirect_uri_mismatch") {
+      if (urlError || urlDesc) {
+        console.error("Auth error details:", { error: urlError, description: urlDesc });
+        const lowerDesc = (urlDesc || "").toLowerCase();
+        const lowerError = (urlError || "").toLowerCase();
+
+        if (lowerDesc.includes("invalid api key") || lowerError.includes("invalid api key")) {
           setError(
-            urlDesc
-              ? `Google Sign-In failed: ${urlDesc}. Please verify the Google OAuth redirect URI in Google Cloud Console and Supabase.`
-              : "Google Sign-In failed. OAuth configuration mismatch. Please verify the Google OAuth redirect URI."
+            "Authentication failed: Invalid Supabase API Key. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
           );
+        } else if (
+          lowerError.includes("redirect_uri_mismatch") ||
+          lowerDesc.includes("redirect_uri_mismatch")
+        ) {
+          setError(
+            "Google Sign-In failed: Redirect URI mismatch. Please verify authorized redirect URIs in Google Cloud Console and Supabase."
+          );
+        } else if (lowerError.includes("access_denied")) {
+          setError("Google Sign-In was cancelled or access was denied.");
         } else {
           setError(urlDesc || `Authentication failed: ${urlError}`);
         }

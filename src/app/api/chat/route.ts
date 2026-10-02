@@ -181,6 +181,62 @@ export async function POST(req: NextRequest) {
       let sources: any[] = [];
       let modelStream: AsyncGenerator<string, void, unknown>;
 
+      // Check for personal assistant workflows
+      const { PersonalOrchestrator } = await import("@/lib/orchestration/personal-orchestrator");
+      const personalResult = await PersonalOrchestrator.handlePersonalPrompt(message, userId);
+      if (personalResult && personalResult.handled) {
+        await safeSendEvent({
+          type: "status",
+          message: `Executing ${personalResult.intentType.toLowerCase().replace(/_/g, " ")}...`,
+        });
+
+        await safeSendEvent({
+          type: "generation_started",
+          botName: "Personal Assistant",
+        });
+
+        const chunks = personalResult.responseMarkdown.match(/.{1,35}/g) || [personalResult.responseMarkdown];
+        for (const chunk of chunks) {
+          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+          accumulatedResponse += chunk;
+          chunkCount++;
+          await safeSendEvent({
+            type: "token",
+            content: chunk,
+          });
+          await new Promise((r) => setTimeout(r, 12));
+        }
+
+        if (personalResult.actionCard) {
+          await safeSendEvent({
+            type: "action_card",
+            card: personalResult.actionCard,
+          });
+        }
+
+        const totalDuration = Math.round(performance.now() - requestStartTime);
+        await safeSendEvent({
+          type: "message_complete",
+          conversationId: convId,
+          metrics: {
+            totalLatencyMs: totalDuration,
+            tokenCount: accumulatedResponse.split(/\s+/).length,
+            model: "Personal Assistant Engine",
+          },
+        });
+
+        if (convId && accumulatedResponse.trim()) {
+          try {
+            await DbService.addMessage(convId, "assistant", accumulatedResponse);
+          } catch (dbErr) {
+            console.error("[CHAT] Assistant message persistence notice:", dbErr);
+          }
+        }
+
+        await safeCloseWriter();
+        return;
+      }
+
       if (shouldSearchWeb) {
         await safeSendEvent({
           type: "status",
