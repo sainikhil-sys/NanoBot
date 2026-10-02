@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { WorkflowStore } from "@/lib/workflows/store";
 import { parseSchedule, computeNextRun } from "@/lib/automations/cron";
+import { generateWebhookSecret } from "@/lib/workflows/webhooks";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,6 +16,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (body.status === "active" || body.status === "paused") {
       automation.status = body.status;
+    }
+
+    // Rotate the webhook signing secret on request.
+    if (body.regenerateSecret === true && automation.triggerType === "webhook") {
+      automation.webhookSecret = generateWebhookSecret();
     }
 
     if (typeof body.schedule === "string" && automation.triggerType === "schedule") {

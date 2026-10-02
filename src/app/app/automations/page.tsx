@@ -31,6 +31,132 @@ function relativeTime(iso?: string): string {
   return diff >= 0 ? `${days}d ago` : `in ${days}d`;
 }
 
+interface WebhookDeliveryRow {
+  id: string;
+  status: "accepted" | "duplicate" | "rejected" | "error";
+  eventId: string;
+  runId?: string;
+  reason?: string;
+  receivedAt: string;
+}
+
+function WebhookPanel({ automation, onChanged }: { automation: Automation; onChanged: () => void }) {
+  const [revealed, setRevealed] = React.useState(false);
+  const [copied, setCopied] = React.useState<string | null>(null);
+  const [deliveries, setDeliveries] = React.useState<WebhookDeliveryRow[] | null>(null);
+  const [showDeliveries, setShowDeliveries] = React.useState(false);
+  const [regenerating, setRegenerating] = React.useState(false);
+
+  const url = typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/${automation.id}` : `/api/webhooks/${automation.id}`;
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const loadDeliveries = async () => {
+    const next = !showDeliveries;
+    setShowDeliveries(next);
+    if (next && deliveries === null) {
+      try {
+        const res = await fetch(`/api/webhooks/${automation.id}/deliveries`);
+        if (res.ok) setDeliveries((await res.json()).deliveries || []);
+      } catch {
+        setDeliveries([]);
+      }
+    }
+  };
+
+  const regenerate = async () => {
+    if (!confirm("Regenerate the signing secret? The old secret will stop working immediately.")) return;
+    setRegenerating(true);
+    try {
+      await fetch(`/api/automations/${automation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regenerateSecret: true }),
+      });
+      onChanged();
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  return (
+    <div className="pt-3 border-t border-[#E5E7EB] space-y-2.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-mono uppercase text-[#9CA3AF] w-16 shrink-0">Endpoint</span>
+        <code className="flex-1 min-w-0 truncate text-[11px] font-mono bg-[#FAFAFA] border border-[#E5E7EB] rounded-lg px-2 py-1 text-black">
+          POST {url}
+        </code>
+        <button type="button" onClick={() => copy(url, "url")} className="text-[11px] font-semibold text-black hover:underline shrink-0">
+          {copied === "url" ? "Copied" : "Copy"}
+        </button>
+      </div>
+
+      {automation.webhookSecret && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase text-[#9CA3AF] w-16 shrink-0">Secret</span>
+          <code className="flex-1 min-w-0 truncate text-[11px] font-mono bg-[#FAFAFA] border border-[#E5E7EB] rounded-lg px-2 py-1 text-black">
+            {revealed ? automation.webhookSecret : "whsec_" + "•".repeat(20)}
+          </code>
+          <button type="button" onClick={() => setRevealed((r) => !r)} className="text-[11px] font-semibold text-black hover:underline shrink-0">
+            {revealed ? "Hide" : "Reveal"}
+          </button>
+          <button type="button" onClick={() => copy(automation.webhookSecret!, "secret")} className="text-[11px] font-semibold text-black hover:underline shrink-0">
+            {copied === "secret" ? "Copied" : "Copy"}
+          </button>
+          <button type="button" onClick={regenerate} disabled={regenerating} className="text-[11px] font-semibold text-red-600 hover:underline shrink-0 disabled:opacity-50">
+            {regenerating ? "…" : "Regenerate"}
+          </button>
+        </div>
+      )}
+
+      <p className="text-[10px] text-[#9CA3AF] font-mono leading-relaxed">
+        Sign the raw body: <span className="text-[#6B7280]">x-nanobot-signature: sha256=HMAC_SHA256(body, secret)</span>.
+        Set <span className="text-[#6B7280]">x-nanobot-event-id</span> for idempotency.
+      </p>
+
+      <button type="button" onClick={loadDeliveries} className="text-[11px] font-semibold text-black hover:underline">
+        {showDeliveries ? "Hide deliveries" : "Recent deliveries"}
+      </button>
+
+      {showDeliveries && (
+        <div className="space-y-1">
+          {deliveries === null ? (
+            <div className="text-[11px] text-[#9CA3AF]">Loading…</div>
+          ) : deliveries.length === 0 ? (
+            <div className="text-[11px] text-[#9CA3AF]">No deliveries yet. Send a POST to the endpoint above.</div>
+          ) : (
+            deliveries.map((d) => (
+              <div key={d.id} className="flex items-center gap-2 text-[11px] font-mono">
+                <span
+                  className={`px-1.5 py-0.5 rounded ${
+                    d.status === "accepted"
+                      ? "bg-green-50 text-[#16A34A] border border-green-200"
+                      : d.status === "duplicate"
+                      ? "bg-neutral-100 text-[#6B7280] border border-[#E5E7EB]"
+                      : "bg-red-50 text-red-600 border border-red-200"
+                  }`}
+                >
+                  {d.status}
+                </span>
+                <span className="text-[#9CA3AF] truncate">{d.eventId}</span>
+                <span className="text-[#9CA3AF] ml-auto shrink-0">{relativeTime(d.receivedAt)}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AutomationsPage() {
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowDefinition[]>([]);
@@ -377,6 +503,8 @@ export default function AutomationsPage() {
                       </div>
                     )}
                   </div>
+
+                  {isWebhook && <WebhookPanel automation={item} onChanged={load} />}
                 </div>
               );
             })}

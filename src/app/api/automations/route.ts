@@ -3,6 +3,7 @@ import { Automation, AutomationTriggerType } from "@/lib/workflows/types";
 import { WorkflowStore } from "@/lib/workflows/store";
 import { DEFAULT_WORKFLOWS } from "@/lib/workflows/seed";
 import { parseSchedule, computeNextRun } from "@/lib/automations/cron";
+import { generateWebhookSecret } from "@/lib/workflows/webhooks";
 import { DbService } from "@/lib/supabase/db-service";
 
 function ensureWorkflowsSeeded() {
@@ -60,6 +61,8 @@ export async function POST(req: NextRequest) {
       workflowName: workflow.name,
       triggerType,
       schedule,
+      // Webhook automations get a signing secret so inbound calls can be verified.
+      webhookSecret: triggerType === "webhook" ? generateWebhookSecret() : undefined,
       timezone: body.timezone || "UTC",
       retryPolicy: body.retryPolicy,
       status: "active",

@@ -158,6 +158,8 @@ export interface Automation {
   triggerType: AutomationTriggerType;
   /** For schedule triggers: a cron expression or `every:<n><unit>` interval. */
   schedule?: string;
+  /** For webhook triggers: shared secret used to verify inbound HMAC signatures. */
+  webhookSecret?: string;
   timezone?: string;
   retryPolicy?: RetryPolicy;
   status: AutomationStatus;

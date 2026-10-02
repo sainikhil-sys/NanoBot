@@ -15,6 +15,7 @@ import {
   DeadLetterJob,
   Automation,
 } from "./types";
+import type { WebhookDelivery } from "./webhooks";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 interface WorkflowRuntimeStore {
@@ -29,6 +30,8 @@ interface WorkflowRuntimeStore {
   automations: Map<string, Automation>;
   /** Processed idempotency keys → the run id that first handled them. */
   idempotency: Map<string, string>;
+  /** Webhook delivery log, newest appended. */
+  webhookDeliveries: WebhookDelivery[];
 }
 
 declare global {
@@ -46,7 +49,11 @@ function store(): WorkflowRuntimeStore {
       deadLetters: new Map(),
       automations: new Map(),
       idempotency: new Map(),
+      webhookDeliveries: [],
     };
+  }
+  if (!globalThis.__nanobotWorkflowStore.webhookDeliveries) {
+    globalThis.__nanobotWorkflowStore.webhookDeliveries = [];
   }
   return globalThis.__nanobotWorkflowStore;
 }
@@ -266,6 +273,7 @@ export const WorkflowStore = {
         workflow_name: automation.workflowName,
         trigger_type: automation.triggerType,
         schedule: automation.schedule ?? null,
+        webhook_secret: automation.webhookSecret ?? null,
         timezone: automation.timezone ?? null,
         retry_policy: automation.retryPolicy ?? null,
         status: automation.status,
@@ -284,6 +292,30 @@ export const WorkflowStore = {
       await sb.from("automations").delete().eq("id", id);
     });
     return existed;
+  },
+
+  // ---- Webhook deliveries ---------------------------------------------------
+  recordWebhookDelivery(delivery: WebhookDelivery): void {
+    const s = store();
+    s.webhookDeliveries.unshift(delivery);
+    if (s.webhookDeliveries.length > 500) s.webhookDeliveries.length = 500;
+    void mirror(async (sb) => {
+      await sb.from("webhook_deliveries").insert({
+        id: delivery.id,
+        automation_id: delivery.automationId,
+        event_id: delivery.eventId,
+        status: delivery.status,
+        run_id: delivery.runId ?? null,
+        reason: delivery.reason ?? null,
+        received_at: delivery.receivedAt,
+      });
+    });
+  },
+
+  listWebhookDeliveries(filter?: { automationId?: string; limit?: number }): WebhookDelivery[] {
+    let list = store().webhookDeliveries;
+    if (filter?.automationId) list = list.filter((d) => d.automationId === filter.automationId);
+    return filter?.limit ? list.slice(0, filter.limit) : list;
   },
 
   /** Test-only reset of the in-memory store. */
