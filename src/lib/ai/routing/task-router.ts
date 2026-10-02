@@ -84,6 +84,51 @@ export class TaskRouter {
       };
     }
 
+    // 2.5 Personal Executive Assistant Intent Detection (Emails, Calendar, Tasks, Memory, Briefings, LinkedIn, Drive)
+    const isPersonalIntent =
+      p.includes("email") ||
+      p.includes("inbox") ||
+      p.includes("draft a reply") ||
+      p.includes("reply to") ||
+      p.includes("meeting") ||
+      p.includes("calendar") ||
+      p.includes("schedule") ||
+      p.includes("free slot") ||
+      p.includes("focus on today") ||
+      p.includes("daily briefing") ||
+      p.includes("morning briefing") ||
+      p.includes("overview of my day") ||
+      p.includes("remind me to") ||
+      p.includes("create a task") ||
+      p.includes("create task") ||
+      p.includes("tasks from") ||
+      p.includes("remember that") ||
+      p.includes("linkedin post") ||
+      p.includes("in my drive");
+
+    if (isPersonalIntent) {
+      const bot = BOT_REGISTRY["personal-assistant"] || BOT_REGISTRY["auto"];
+      return {
+        botId: "personal-assistant",
+        botName: "Personal Assistant",
+        category: "Executive",
+        confidence: 0.98,
+        tools: [
+          "gmail_search",
+          "calendar_availability",
+          "tasks_create",
+          "memory_store",
+          "briefing_generate",
+          "linkedin_prepare_post",
+        ],
+        reason: "Detected personal productivity, communication, scheduling, or memory request",
+        taskType: "personal_assistant",
+        requiresWebSearch: false,
+        requiresEmbedding: false,
+        requiresDocumentParsing: false,
+      };
+    }
+
     // 3. High-Dimensional Vector & Embedding Synthesis Detection
     if (
       p.includes("convert this") && (p.includes("vector") || p.includes("embedding")) ||

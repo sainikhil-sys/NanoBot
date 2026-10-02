@@ -191,3 +191,187 @@ export interface VectorRecord {
   created_at: string;
 }
 
+export type PersonalTaskPriority = "low" | "medium" | "high" | "urgent";
+export type PersonalTaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
+export type PersonalTaskSource = "manual" | "email" | "chat" | "calendar" | "workflow";
+
+export interface PersonalTask {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string | null;
+  due_date?: string | null;
+  priority: PersonalTaskPriority;
+  status: PersonalTaskStatus;
+  category: string;
+  source_type: PersonalTaskSource;
+  source_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MemoryCategory =
+  | "profile"
+  | "preferences"
+  | "people"
+  | "projects"
+  | "meetings"
+  | "tasks"
+  | "communication_style"
+  | "important_dates";
+
+export interface PersonalMemory {
+  id: string;
+  user_id: string;
+  category: MemoryCategory;
+  key: string;
+  value: string;
+  confidence: number;
+  is_pinned: boolean;
+  is_disabled: boolean;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConnectedAccount {
+  id: string;
+  user_id: string;
+  provider: "google" | "linkedin" | "github" | "custom";
+  provider_account_id?: string | null;
+  email?: string | null;
+  scopes: string[];
+  access_token_encrypted?: string | null;
+  refresh_token_encrypted?: string | null;
+  token_expires_at?: string | null;
+  status: "connected" | "disconnected" | "expired" | "error";
+  last_synced_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  user_id: string;
+  tool_name: string;
+  permission_level: "READ" | "PREPARE" | "EXECUTE";
+  action_type: string;
+  description: string;
+  payload: Record<string, unknown>;
+  status: "pending" | "approved" | "rejected" | "expired";
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  action: string;
+  tool: string;
+  target?: string | null;
+  permission_level: "READ" | "PREPARE" | "EXECUTE";
+  approval_status: "auto" | "user_approved" | "rejected";
+  result_status: "success" | "failed";
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface DailyBriefing {
+  id: string;
+  user_id: string;
+  date: string;
+  summary: string;
+  email_highlights: Array<{
+    id: string;
+    subject: string;
+    from: string;
+    category: string;
+    urgency: "high" | "medium" | "low";
+    summary: string;
+    actionRequired?: string;
+  }>;
+  calendar_highlights: Array<{
+    id: string;
+    title: string;
+    startTime: string;
+    endTime: string;
+    attendees: string[];
+    prepNotes?: string;
+  }>;
+  task_highlights: Array<{
+    id: string;
+    title: string;
+    dueDate?: string;
+    priority: PersonalTaskPriority;
+    isOverdue?: boolean;
+  }>;
+  recommendations: string[];
+  created_at: string;
+}
+
+export interface EmailClassification {
+  category:
+    | "URGENT"
+    | "ACTION_REQUIRED"
+    | "WAITING_FOR_RESPONSE"
+    | "MEETING"
+    | "DEADLINE"
+    | "PROJECT"
+    | "PERSONAL"
+    | "UNIVERSITY"
+    | "FINANCIAL"
+    | "PROMOTIONAL"
+    | "INFORMATIONAL"
+    | "LOW_PRIORITY";
+  importanceScore: number; // 0-100
+  urgencyScore: number; // 0-100
+  responseRequired: boolean;
+  detectedDeadline?: string | null;
+  detectedAction?: string | null;
+  summary: string;
+}
+
+export interface GmailEmail {
+  id: string;
+  threadId: string;
+  from: string;
+  fromName: string;
+  to: string;
+  subject: string;
+  snippet: string;
+  bodyText: string;
+  date: string;
+  isUnread: boolean;
+  isStarred: boolean;
+  labels: string[];
+  classification: EmailClassification;
+}
+
+export interface CalendarEventItem {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+  attendees: Array<{ email: string; name?: string; responseStatus?: string }>;
+  meetLink?: string;
+  isUpcoming: boolean;
+  prepNotes?: string;
+}
+
+export interface DriveDocumentItem {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes?: number;
+  modifiedTime: string;
+  webViewLink?: string;
+  iconLink?: string;
+  summary?: string;
+}
+
+

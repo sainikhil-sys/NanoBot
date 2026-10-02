@@ -14,16 +14,18 @@ import { useAuth } from "@/components/providers/auth-provider";
 interface HeaderProps {
   title?: string;
   description?: string;
+  subtitle?: string;
   actions?: React.ReactNode;
   action?: React.ReactNode;
 }
 
-export function Header({ title, description, actions, action }: HeaderProps) {
+export function Header({ title, description, subtitle, actions, action }: HeaderProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const effectiveDescription = description || subtitle;
   const effectiveActions = actions || action;
 
   useEffect(() => {
@@ -79,9 +81,9 @@ export function Header({ title, description, actions, action }: HeaderProps) {
             <h1 className="text-[17px] font-bold text-black leading-tight tracking-tight font-sans truncate">
               {title}
             </h1>
-            {description && (
+            {effectiveDescription && (
               <p className="text-[11px] text-[#6B7280] leading-tight font-sans truncate hidden sm:block">
-                {description}
+                {effectiveDescription}
               </p>
             )}
           </div>

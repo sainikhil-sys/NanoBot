@@ -5,11 +5,14 @@ export interface ToolParameter {
   required: boolean;
 }
 
+export type ToolPermissionLevel = "READ" | "PREPARE" | "EXECUTE";
+
 export interface ToolDefinition {
   id: string;
   name: string;
   description: string;
-  category: "Search" | "Data" | "Network" | "Execution" | "Automation";
+  category: "Search" | "Data" | "Network" | "Execution" | "Automation" | "Personal" | "Integration";
+  permissionLevel?: ToolPermissionLevel;
   parameters: ToolParameter[];
   handler: (params: Record<string, unknown>, context?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
@@ -206,6 +209,124 @@ export const SYSTEM_TOOLS: Record<string, ToolDefinition> = {
         executionId: `exec-${Date.now()}`,
         status: "completed",
       };
+    },
+  },
+
+  gmail_search: {
+    id: "gmail_search",
+    name: "Gmail Semantic Search",
+    description: "Searches the user's connected Gmail inbox and threads with semantic importance classification.",
+    category: "Personal",
+    permissionLevel: "READ",
+    parameters: [
+      { name: "query", type: "string", description: "Search query or filter", required: false },
+      { name: "unreadOnly", type: "boolean", description: "Filter only unread emails", required: false },
+    ],
+    handler: async (params) => {
+      const { GmailService } = await import("./personal/gmail-service");
+      return GmailService.searchEmails({
+        query: params.query as string | undefined,
+        unreadOnly: params.unreadOnly as boolean | undefined,
+      });
+    },
+  },
+
+  calendar_availability: {
+    id: "calendar_availability",
+    name: "Google Calendar Free Slots",
+    description: "Calculates and ranks open meeting slots on the user's connected Google Calendar.",
+    category: "Personal",
+    permissionLevel: "READ",
+    parameters: [
+      { name: "date", type: "string", description: "Date (YYYY-MM-DD)", required: true },
+      { name: "durationMinutes", type: "number", description: "Duration in minutes", required: false },
+      { name: "preferredTimeOfDay", type: "string", description: "morning or afternoon", required: false },
+    ],
+    handler: async (params) => {
+      const { CalendarService } = await import("./personal/calendar-service");
+      return CalendarService.findAvailableSlots({
+        date: params.date as string,
+        durationMinutes: (params.durationMinutes as number) || 30,
+        preferredTimeOfDay: params.preferredTimeOfDay as any,
+      });
+    },
+  },
+
+  tasks_create: {
+    id: "tasks_create",
+    name: "Personal Task Creator",
+    description: "Creates and prioritizes a new personal task with due date and category.",
+    category: "Personal",
+    permissionLevel: "PREPARE",
+    parameters: [
+      { name: "title", type: "string", description: "Task title", required: true },
+      { name: "dueDate", type: "string", description: "Due date/time", required: false },
+      { name: "priority", type: "string", description: "low, medium, high, urgent", required: false },
+    ],
+    handler: async (params) => {
+      const { TasksService } = await import("./personal/tasks-service");
+      const task = await TasksService.createTask({
+        title: params.title as string,
+        dueDate: params.dueDate as string | undefined,
+        priority: params.priority as any,
+      });
+      return { success: true, task };
+    },
+  },
+
+  memory_store: {
+    id: "memory_store",
+    name: "Personal Memory Store",
+    description: "Stores persistent facts, preferences, project context, and people in structured personal memory.",
+    category: "Personal",
+    permissionLevel: "PREPARE",
+    parameters: [
+      { name: "category", type: "string", description: "profile, preferences, people, projects, meetings, style, dates", required: true },
+      { name: "key", type: "string", description: "Concept identifier", required: true },
+      { name: "value", type: "string", description: "Memory detail to remember", required: true },
+    ],
+    handler: async (params) => {
+      const { MemoryService } = await import("./personal/memory-service");
+      const mem = await MemoryService.storeMemory({
+        category: params.category as any,
+        key: params.key as string,
+        value: params.value as string,
+      });
+      return { success: true, memory: mem };
+    },
+  },
+
+  linkedin_prepare_post: {
+    id: "linkedin_prepare_post",
+    name: "LinkedIn Post Drafter",
+    description: "Generates high-engagement thought leadership drafts with hashtags and hooks.",
+    category: "Personal",
+    permissionLevel: "PREPARE",
+    parameters: [
+      { name: "topic", type: "string", description: "Post topic or milestone", required: true },
+      { name: "tone", type: "string", description: "thought_leadership, technical, announcement", required: false },
+    ],
+    handler: async (params) => {
+      const { LinkedInService } = await import("./personal/linkedin-service");
+      const draft = LinkedInService.generatePost({
+        topic: params.topic as string,
+        tone: params.tone as any,
+      });
+      return { success: true, draft };
+    },
+  },
+
+  briefing_generate: {
+    id: "briefing_generate",
+    name: "Daily AI Briefing Synthesizer",
+    description: "Generates a synthesized personal daily overview combining emails, calendar events, tasks, and recommendations.",
+    category: "Personal",
+    permissionLevel: "READ",
+    parameters: [],
+    handler: async () => {
+      const { BriefingService } = await import("./personal/briefing-service");
+      const briefing = await BriefingService.generateDailyBriefing();
+      return { success: true, briefing };
     },
   },
 };

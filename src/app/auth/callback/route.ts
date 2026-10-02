@@ -11,27 +11,39 @@ export async function GET(request: NextRequest) {
   // Prevent open redirect attacks: ensure next is a relative path within our app
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/app/overview";
 
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
+  const isLocalhost =
+    requestUrl.hostname === "localhost" || requestUrl.hostname === "127.0.0.1";
+
+  const origin = isLocalhost
+    ? requestUrl.origin
+    : forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : requestUrl.origin;
+
   if (error) {
     console.error("OAuth provider error:", error, error_description);
     return NextResponse.redirect(
       new URL(
         `/auth/sign-in?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(error_description || "Authentication failed")}`,
-        requestUrl.origin
+        origin
       )
     );
   }
 
   if (code) {
     const supabase = await createServerSupabaseClient();
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    const { error: exchangeError } =
+      await supabase.auth.exchangeCodeForSession(code);
     if (!exchangeError) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      return NextResponse.redirect(new URL(next, origin));
     }
     console.error("OAuth code exchange error:", exchangeError.message);
     return NextResponse.redirect(
       new URL(
         `/auth/sign-in?error=OAuthFailed&error_description=${encodeURIComponent(exchangeError.message)}`,
-        requestUrl.origin
+        origin
       )
     );
   }
@@ -40,7 +52,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.redirect(
     new URL(
       "/auth/sign-in?error=OAuthFailed&error_description=No+authorization+code+received",
-      requestUrl.origin
+      origin
     )
   );
 }
