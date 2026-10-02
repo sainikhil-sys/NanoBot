@@ -72,6 +72,12 @@ const ACTIVITY_NAV_ITEMS: NavItem[] = [
   { title: "Logs", href: "/app/logs", icon: Scroll },
 ];
 
+const LAB_NAV_ITEMS: NavItem[] = [
+  { title: "NLP Lab", href: "/app/nlp-lab", icon: Brain },
+  { title: "Embedding Lab", href: "/app/embedding-lab", icon: Pulse },
+  { title: "NanoBench", href: "/app/nanobench", icon: ChartLine },
+];
+
 const SYSTEM_NAV_ITEMS: NavItem[] = [
   { title: "Settings", href: "/app/settings", icon: Gear },
 ];
@@ -214,6 +220,14 @@ export function Sidebar() {
             {renderNavList(ACTIVITY_NAV_ITEMS)}
           </div>
 
+          {/* Laboratory Section */}
+          <div className="space-y-1 pt-1 border-t border-[#F3F4F6]">
+            <div className="px-3 text-[10px] font-mono uppercase tracking-wider text-[#9CA3AF] font-semibold">
+              Laboratory
+            </div>
+            {renderNavList(LAB_NAV_ITEMS)}
+          </div>
+
           {/* 3. System Section */}
           <div className="space-y-1 pt-1 border-t border-[#F3F4F6]">
             <div className="px-3 text-[10px] font-mono uppercase tracking-wider text-[#9CA3AF] font-semibold">
@@ -331,4 +345,5 @@ export function Sidebar() {
     </>
   );
 }
+
 

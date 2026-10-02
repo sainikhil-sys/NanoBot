@@ -1,4 +1,4 @@
-import { DbService } from "@/lib/supabase/db-service";
+﻿import { DbService } from "@/lib/supabase/db-service";
 import { ConnectedAccount } from "@/types/database.types";
 
 export interface ProviderScopeInfo {
@@ -87,10 +87,13 @@ export class OAuthManager {
     const redirectUri = `${origin}/api/connected-accounts/callback`;
 
     if (provider === "google") {
-      const clientId =
-        process.env.GOOGLE_CLIENT_ID ||
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-        "258635100958-gp51jl6j5b88r9bkl7427ojbevltm0v7.apps.googleusercontent.com";
+      // Credentials must come from the environment — never hard-coded (rule #11).
+      const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        throw new Error(
+          `Google is not configured yet. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then register this exact redirect URI in your Google Cloud Console OAuth client: ${redirectUri}`
+        );
+      }
 
       const scopes = [
         ...OAUTH_PROVIDERS.google.requiredScopes,
@@ -111,7 +114,12 @@ export class OAuthManager {
     }
 
     if (provider === "linkedin") {
-      const clientId = process.env.LINKEDIN_CLIENT_ID || "";
+      const clientId = process.env.LINKEDIN_CLIENT_ID;
+      if (!clientId) {
+        throw new Error(
+          `LinkedIn is not configured yet. Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET, then register this exact redirect URI in the LinkedIn Developer portal: ${redirectUri}`
+        );
+      }
       const scopes = [
         ...OAUTH_PROVIDERS.linkedin.requiredScopes,
         ...(customScopes || OAUTH_PROVIDERS.linkedin.recommendedScopes),
@@ -149,3 +157,4 @@ export class OAuthManager {
     return result;
   }
 }
+
