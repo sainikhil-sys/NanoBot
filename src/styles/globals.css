@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -96,7 +96,7 @@
   background: #D1D5DB;
 }
 
-/* ─────────────────────── Infinite Marquee Animation ─────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Infinite Marquee Animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes marquee-scroll {
   0% {
     transform: translateX(0%);
@@ -123,3 +123,19 @@
     transform: none;
   }
 }
+
+/* Landing-page entrance: pure CSS so content is visible even if JS never runs. */
+@keyframes nb-fade-in {
+  from { transform: translateY(10px); }
+  to { transform: none; }
+}
+.nb-reveal {
+  /* opacity stays 1 at all times so content is never hidden; only a subtle slide animates */
+  animation: nb-fade-in 0.5s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nb-reveal {
+    animation: none;
+  }
+}
+

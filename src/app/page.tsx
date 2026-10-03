@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -33,7 +33,7 @@ import {
 } from "@phosphor-icons/react";
 import { AnnouncementMarquee } from "@/components/layout/announcement-marquee";
 
-/* Respect reduced motion for all JS-driven animation. */
+/* Respect reduced motion for JS-driven animation (hero only). */
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -46,35 +46,12 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-/* Lightweight scroll-reveal; renders visible immediately under reduced motion. */
+/* Content is ALWAYS visible - never gated behind JS/hydration. A subtle CSS slide
+   (globals.css .nb-reveal) provides entrance polish and is disabled under
+   prefers-reduced-motion. If JS never runs, content still shows. */
 function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const reduced = usePrefersReducedMotion();
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    if (reduced) { setShown(true); return; }
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && setShown(true)),
-      { threshold: 0.15 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [reduced]);
-  return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: shown ? 1 : 0,
-        transform: shown ? "none" : "translateY(16px)",
-        transition: reduced ? "none" : `opacity .6s ease ${delay}ms, transform .6s ease ${delay}ms`,
-      }}
-    >
-      {children}
-    </div>
-  );
+  void delay;
+  return <div className={`nb-reveal ${className}`.trim()}>{children}</div>;
 }
 
 /* ---------- Header ---------- */
@@ -120,7 +97,7 @@ const PIPELINE = [
 
 function HeroWorkflow() {
   const reduced = usePrefersReducedMotion();
-  const [active, setActive] = useState(reduced ? PIPELINE.length : 0);
+  const [active, setActive] = useState(0);
   useEffect(() => {
     if (reduced) { setActive(PIPELINE.length); return; }
     const t = setInterval(() => setActive((a) => (a >= PIPELINE.length ? 0 : a + 1)), 900);
@@ -129,7 +106,7 @@ function HeroWorkflow() {
   return (
     <div className="w-full rounded-2xl border border-[#EBEBEB] bg-white shadow-sm p-4 sm:p-5">
       <div className="flex items-center justify-between mb-4 px-1">
-        <span className="text-[11px] font-mono uppercase tracking-wider text-[#9CA3AF]">workflow run · live preview</span>
+        <span className="text-[11px] font-mono uppercase tracking-wider text-[#9CA3AF]">workflow run / live preview</span>
         <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#16A34A]">
           <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A] animate-pulse" /> executing
         </span>
@@ -154,7 +131,7 @@ function HeroWorkflow() {
                   <div className="text-[10px] font-mono text-[#9CA3AF]">{n.kind}</div>
                 </div>
                 <div className="ml-auto text-[11px] font-mono shrink-0">
-                  {done ? <CheckCircle weight="fill" className="h-4 w-4 text-[#16A34A]" /> : running ? <span className="text-black">running…</span> : <span className="text-[#C7C7C7]">idle</span>}
+                  {done ? <CheckCircle weight="fill" className="h-4 w-4 text-[#16A34A]" /> : running ? <span className="text-black">running</span> : <span className="text-[#C7C7C7]">idle</span>}
                 </div>
               </div>
             </div>
@@ -172,13 +149,13 @@ function HeroSection() {
       <div className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         <div className="space-y-6">
           <div className="inline-flex items-center border border-[#EBEBEB] rounded-full px-3.5 py-1 text-xs text-neutral-500 bg-white/80 backdrop-blur-sm shadow-2xs font-sans">
-            AI agents · Knowledge · Workflow automation
+            AI agents / Knowledge / Workflow automation
           </div>
           <h1 className="leading-[0.98] font-medium tracking-tight text-black font-sans" style={{ fontSize: "clamp(40px, 6vw, 72px)" }}>
             Build AI workflows<br />that <span className="italic font-serif">actually</span> run.
           </h1>
           <p className="text-[17px] text-neutral-600 max-w-[520px] leading-[1.7] font-sans">
-            NanoBot connects models, your knowledge, and real integrations into workflows you can build, execute, inspect, and control — with an assistant for your inbox, calendar, and tasks alongside.
+            NanoBot connects models, your knowledge, and real integrations into workflows you can build, execute, inspect, and control, with an assistant for your inbox, calendar, and tasks alongside.
           </p>
           <div className="flex gap-3 flex-wrap">
             <Link href="/app/overview" className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-black text-white hover:bg-[#1A1A1A] text-sm font-medium tracking-tight shadow-xs gap-1.5">
@@ -246,10 +223,10 @@ function TriggerToResult() {
       <div className="max-w-6xl mx-auto px-6">
         <Reveal><Kicker eyebrow="From trigger to result" title="Every run follows the same transparent path." desc="No black box. Each stage is a real node that executes, records its input and output, and shows exactly what happened." /></Reveal>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-          {steps.map((s, i) => {
+          {steps.map((s) => {
             const Icon = s.icon;
             return (
-              <Reveal key={s.k} delay={i * 60}>
+              <Reveal key={s.k}>
                 <div className="h-full p-4 rounded-2xl border border-[#EBEBEB] bg-[#FAFAFA] hover:border-black transition-colors">
                   <div className="h-9 w-9 rounded-xl bg-white border border-[#E5E7EB] flex items-center justify-center mb-3"><Icon weight="bold" className="h-4 w-4 text-black" /></div>
                   <div className="text-[13px] font-bold text-black">{s.k}</div>
@@ -273,7 +250,7 @@ function BuilderSection() {
   return (
     <section id="builder" className="py-20 bg-[#FAFAFA] border-b border-[#EBEBEB]">
       <div className="max-w-6xl mx-auto px-6">
-        <Reveal><Kicker eyebrow="Workflow builder" title="Compose nodes into a real, versioned pipeline." desc="Triggers, AI, logic, data and communication nodes. Editing publishes a new version — in-flight runs keep the version they started on." /></Reveal>
+        <Reveal><Kicker eyebrow="Workflow builder" title="Compose nodes into a real, versioned pipeline." desc="Triggers, AI, logic, data and communication nodes. Editing publishes a new version, and in-flight runs keep the version they started on." /></Reveal>
         <Reveal>
           <div className="rounded-2xl border border-[#EBEBEB] bg-white p-5 shadow-sm overflow-x-auto">
             <div className="flex items-stretch gap-2 min-w-max">
@@ -308,18 +285,18 @@ function AgentsKnowledge() {
           <div className="h-full p-7 rounded-3xl border border-[#EBEBEB] bg-[#FAFAFA]">
             <div className="h-11 w-11 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center mb-5"><Robot weight="bold" className="h-5 w-5 text-black" /></div>
             <h3 className="text-[20px] font-semibold text-black mb-2">AI agents that use real tools</h3>
-            <p className="text-[14px] text-neutral-600 leading-relaxed mb-4">Intent → plan → tool selection → execution → observation → result. Every tool call is logged so you can see what the agent did.</p>
+            <p className="text-[14px] text-neutral-600 leading-relaxed mb-4">Intent, plan, tool selection, execution, observation, result. Every tool call is logged so you can see what the agent did.</p>
             <div className="flex flex-wrap gap-2">
               {["HTTP", "Web search", "Embeddings", "Integrations", "Code (JS sandbox)"].map((t) => <span key={t} className="text-[11px] font-mono px-2 py-1 rounded-lg bg-white border border-[#E5E7EB] text-[#374151]">{t}</span>)}
             </div>
             <Link href="/app/bots" className="inline-flex items-center gap-1.5 text-sm font-semibold text-black hover:underline mt-5">Explore agents <ArrowRight weight="bold" className="h-3.5 w-3.5" /></Link>
           </div>
         </Reveal>
-        <Reveal delay={80}>
+        <Reveal>
           <div className="h-full p-7 rounded-3xl border border-[#EBEBEB] bg-[#FAFAFA]">
             <div className="h-11 w-11 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center mb-5"><Books weight="bold" className="h-5 w-5 text-black" /></div>
             <h3 className="text-[20px] font-semibold text-black mb-2">Knowledge & RAG with citations</h3>
-            <p className="text-[14px] text-neutral-600 leading-relaxed mb-4">Upload → parse → chunk → embed → retrieve → answer. Responses expose the source references they were grounded on.</p>
+            <p className="text-[14px] text-neutral-600 leading-relaxed mb-4">Upload, parse, chunk, embed, retrieve, answer. Responses expose the source references they were grounded on.</p>
             <div className="flex flex-wrap gap-2">
               {["PDF", "DOCX", "TXT", "Markdown", "CSV", "Code"].map((t) => <span key={t} className="text-[11px] font-mono px-2 py-1 rounded-lg bg-white border border-[#E5E7EB] text-[#374151]">{t}</span>)}
             </div>
@@ -343,10 +320,10 @@ function IntegrationsSection() {
       <div className="max-w-6xl mx-auto px-6">
         <Reveal><Kicker eyebrow="Integrations" title="Only what actually works." desc="Each integration here has a real execution path. Connect OAuth providers from Connected Accounts; status reflects your real configuration." /></Reveal>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {INTEGRATIONS.map((it, idx) => {
+          {INTEGRATIONS.map((it) => {
             const Icon = it.i;
             return (
-              <Reveal key={it.n} delay={idx * 40}>
+              <Reveal key={it.n}>
                 <div className="p-4 rounded-2xl border border-[#EBEBEB] bg-white hover:border-black transition-colors flex items-center gap-3">
                   <div className="h-9 w-9 rounded-xl bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center shrink-0"><Icon weight="bold" className="h-4 w-4 text-black" /></div>
                   <span className="text-[13px] font-semibold text-black">{it.n}</span>
@@ -367,12 +344,12 @@ function AutomationsSection() {
   return (
     <section className="py-20 bg-white border-b border-[#EBEBEB]">
       <div className="max-w-6xl mx-auto px-6">
-        <Reveal><Kicker eyebrow="Automations" title="Schedule it. Trigger it. Let NanoBot execute it." desc="Bind a trigger to a workflow. Every execution is recorded — the run count you see is real, never fabricated." /></Reveal>
+        <Reveal><Kicker eyebrow="Automations" title="Schedule it. Trigger it. Let NanoBot execute it." desc="Bind a trigger to a workflow. Every execution is recorded, and the run count you see is real, never fabricated." /></Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-          {triggers.map((t, i) => {
+          {triggers.map((t) => {
             const Icon = t.i;
             return (
-              <Reveal key={t.t} delay={i * 60}>
+              <Reveal key={t.t}>
                 <div className="p-5 rounded-2xl border border-[#EBEBEB] bg-[#FAFAFA] flex items-center gap-3">
                   <div className="h-9 w-9 rounded-xl bg-white border border-[#E5E7EB] flex items-center justify-center"><Icon weight="bold" className="h-4 w-4 text-[#16A34A]" /></div>
                   <span className="text-sm font-semibold text-black">{t.t}</span>
@@ -416,10 +393,10 @@ function HumanControl() {
           </div>
         </Reveal>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {controls.map((c, i) => {
+          {controls.map((c) => {
             const Icon = c.i;
             return (
-              <Reveal key={c.t} delay={i * 50}>
+              <Reveal key={c.t}>
                 <div className="p-4 rounded-2xl border border-white/10 bg-white/5 flex items-center gap-2">
                   <Icon weight="bold" className="h-4 w-4 text-[#86efac]" /><span className="text-[13px] font-semibold">{c.t}</span>
                 </div>
@@ -445,9 +422,9 @@ function Observability() {
           <Kicker eyebrow="Observability" title="Inspect every execution." desc="Each run keeps a full trace: node status, duration, retries, inputs and outputs (secrets masked), and logs. Permanent failures land in a dead-letter queue you can replay." />
           <Link href="/app/executions" className="inline-flex items-center gap-1.5 text-sm font-semibold text-black hover:underline">Open Executions <ArrowRight weight="bold" className="h-3.5 w-3.5" /></Link>
         </Reveal>
-        <Reveal delay={80}>
+        <Reveal>
           <div className="rounded-2xl border border-[#EBEBEB] bg-[#0B0B0C] p-5 font-mono text-[13px] text-neutral-300">
-            <div className="text-neutral-500 mb-3">RUN · workflow v3</div>
+            <div className="text-neutral-500 mb-3">RUN / workflow v3</div>
             {rows.map((r) => (
               <div key={r.t} className="flex items-center gap-2 py-1">
                 {r.s === "ok" && <CheckCircle weight="fill" className="h-4 w-4 text-[#16A34A]" />}
@@ -473,12 +450,12 @@ function LabsSection() {
   return (
     <section className="py-20 bg-[#FAFAFA] border-b border-[#EBEBEB]">
       <div className="max-w-6xl mx-auto px-6">
-        <Reveal><Kicker eyebrow="Laboratory" title="See the NLP and vectors underneath." desc="Interactive labs that expose the real computations behind the product — nothing is faked." /></Reveal>
+        <Reveal><Kicker eyebrow="Laboratory" title="See the NLP and vectors underneath." desc="Interactive labs that expose the real computations behind the product. Nothing is faked." /></Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {labs.map((l, i) => {
+          {labs.map((l) => {
             const Icon = l.i;
             return (
-              <Reveal key={l.t} delay={i * 60}>
+              <Reveal key={l.t}>
                 <Link href={l.href} className="block h-full p-6 rounded-3xl border border-[#EBEBEB] bg-white hover:border-black transition-colors group">
                   <div className="h-11 w-11 rounded-2xl bg-[#FAFAFA] border border-[#E5E7EB] flex items-center justify-center mb-4"><Icon weight="bold" className="h-5 w-5 text-black" /></div>
                   <div className="text-[16px] font-semibold text-black flex items-center gap-1">{l.t}<Flask weight="bold" className="h-3.5 w-3.5 text-[#16A34A] opacity-0 group-hover:opacity-100 transition-opacity" /></div>
@@ -496,20 +473,20 @@ function LabsSection() {
 /* ---------- 12 Use cases ---------- */
 function UseCases() {
   const cases = [
-    { role: "Developer", icon: GithubLogo, steps: "GitHub issue → classify → investigate → draft response → request approval" },
-    { role: "Operations", icon: Lightning, steps: "Form submission → validate → classify → write to database → notify" },
-    { role: "Knowledge", icon: Books, steps: "Upload documents → index → retrieve → answer with sources" },
-    { role: "Data", icon: Database, steps: "Upload CSV → analyze → calculate → summarize" },
+    { role: "Developer", icon: GithubLogo, steps: "GitHub issue, classify, investigate, draft response, request approval" },
+    { role: "Operations", icon: Lightning, steps: "Form submission, validate, classify, write to database, notify" },
+    { role: "Knowledge", icon: Books, steps: "Upload documents, index, retrieve, answer with sources" },
+    { role: "Data", icon: Database, steps: "Upload CSV, analyze, calculate, summarize" },
   ];
   return (
     <section className="py-20 bg-white border-b border-[#EBEBEB]">
       <div className="max-w-6xl mx-auto px-6">
         <Reveal><Kicker eyebrow="Use cases" title="Concrete workflows, not slogans." /></Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {cases.map((c, i) => {
+          {cases.map((c) => {
             const Icon = c.icon;
             return (
-              <Reveal key={c.role} delay={i * 60}>
+              <Reveal key={c.role}>
                 <div className="h-full p-6 rounded-3xl border border-[#EBEBEB] bg-[#FAFAFA]">
                   <div className="flex items-center gap-2 mb-3"><Icon weight="bold" className="h-4 w-4 text-black" /><span className="text-[13px] font-bold text-black uppercase tracking-wide font-mono">{c.role}</span></div>
                   <p className="text-[14px] text-neutral-700 font-mono leading-relaxed">{c.steps}</p>
@@ -529,10 +506,10 @@ function Security() {
   return (
     <section className="py-20 bg-[#FAFAFA] border-b border-[#EBEBEB]">
       <div className="max-w-6xl mx-auto px-6">
-        <Reveal><Kicker eyebrow="Security & data control" title="Controls that are actually implemented." desc="No compliance badges we have not earned — just the concrete controls in the codebase today." /></Reveal>
+        <Reveal><Kicker eyebrow="Security & data control" title="Controls that are actually implemented." desc="No compliance badges we have not earned, just the concrete controls in the codebase today." /></Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {controls.map((c, i) => (
-            <Reveal key={c} delay={i * 40}>
+          {controls.map((c) => (
+            <Reveal key={c}>
               <div className="h-full p-4 rounded-2xl border border-[#EBEBEB] bg-white flex items-start gap-2">
                 <ShieldCheck weight="fill" className="h-4 w-4 text-[#16A34A] shrink-0 mt-0.5" /><span className="text-[13px] text-[#374151]">{c}</span>
               </div>
@@ -550,7 +527,7 @@ const FAQS = [
   { q: "What happens when a step fails?", a: "Retryable errors back off and retry; non-retryable ones stop immediately. A permanently failed run moves to a dead-letter queue where you can read the error and replay it." },
   { q: "Do my webhooks run twice if delivered twice?", a: "No. Webhooks are verified by signature and de-duplicated by event id, so a repeated delivery does not execute the workflow a second time." },
   { q: "Are the metrics on this page real?", a: "There are no fabricated metrics here. NanoBench only shows numbers measured by running the real services, and automation run counts come from actual executions." },
-  { q: "How do I connect Gmail or LinkedIn?", a: "Configure your own OAuth app credentials, then connect from Connected Accounts. Tokens are exchanged server-side and stored encrypted — never exposed to the browser." },
+  { q: "How do I connect Gmail or LinkedIn?", a: "Configure your own OAuth app credentials, then connect from Connected Accounts. Tokens are exchanged server-side and stored encrypted, never exposed to the browser." },
 ];
 function FAQSection() {
   const [open, setOpen] = useState<number | null>(0);
@@ -560,7 +537,7 @@ function FAQSection() {
         <Reveal><Kicker eyebrow="FAQ" title="Questions, answered plainly." /></Reveal>
         <div className="space-y-3">
           {FAQS.map((f, i) => (
-            <Reveal key={f.q} delay={i * 40}>
+            <Reveal key={f.q}>
               <div className="rounded-2xl border border-[#EBEBEB] bg-[#FAFAFA] overflow-hidden">
                 <button type="button" onClick={() => setOpen(open === i ? null : i)} className="w-full flex items-center justify-between gap-3 p-4 text-left">
                   <span className="text-[15px] font-semibold text-black">{f.q}</span>
@@ -601,7 +578,7 @@ function Footer() {
             <div className="h-6 w-6 rounded bg-black text-white flex items-center justify-center font-mono text-xs font-bold">N</div>
             <span className="font-semibold text-black">NanoBot</span>
           </div>
-          <p className="text-neutral-500 leading-relaxed text-xs">AI agents, knowledge, and workflow automation — with an assistant for your inbox, calendar, and tasks.</p>
+          <p className="text-neutral-500 leading-relaxed text-xs">AI agents, knowledge, and workflow automation, with an assistant for your inbox, calendar, and tasks.</p>
         </div>
         <div>
           <h4 className="font-semibold text-black mb-3 text-xs uppercase tracking-wider font-mono">Platform</h4>
@@ -630,7 +607,7 @@ function Footer() {
           </ul>
         </div>
       </div>
-      <div className="max-w-6xl mx-auto px-6 mt-8 text-[11px] font-mono text-neutral-400">© {new Date().getFullYear()} NanoBot. All rights reserved.</div>
+      <div className="max-w-6xl mx-auto px-6 mt-8 text-[11px] font-mono text-neutral-400">(c) {new Date().getFullYear()} NanoBot. All rights reserved.</div>
     </footer>
   );
 }
