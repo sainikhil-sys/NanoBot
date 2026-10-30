@@ -128,3 +128,37 @@ cd ml-service
 $env:PYTHONPATH="."
 .\.venv\Scripts\python.exe -m pytest tests/
 ```
+
+
+---
+
+## Multimodal Processing (Audio, Images & Video)
+
+NanoBot's FastAPI service exposes optional local-model endpoints for multimodal input. These endpoints do not require paid API keys. The first request downloads the configured open model weights; CPU inference can be slow.
+
+### Install optional model dependencies
+```bash
+cd ml-service
+uv pip install -r requirements-multimodal.txt --python .venv/Scripts/python.exe
+```
+
+On Linux/macOS, use the equivalent Python executable path for your virtual environment.
+
+### Endpoints
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/multimodal/health` | Check multimodal route/model status |
+| POST | `/multimodal/audio/transcribe` | Speech-to-text with timestamped segments and language detection |
+| POST | `/multimodal/image/analyze` | Image captioning and image dimensions |
+| POST | `/multimodal/video/analyze` | Sample video frames, produce timestamped captions, and transcribe an embedded audio track when FFmpeg is installed |
+
+Send each POST request as multipart form data with the file field named `file`.
+
+### Model configuration
+- Audio: Faster-Whisper, default model `small`; override with `NANOBOT_WHISPER_MODEL`.
+- Images/video frames: BLIP image captioning, default `Salesforce/blip-image-captioning-base`; override with `NANOBOT_IMAGE_MODEL`.
+- Upload size defaults to 100 MiB. Override with `NANOBOT_MAX_MEDIA_BYTES` (bytes).
+- Video sampling defaults to at most 8 frames at 2-second intervals. Configure with `NANOBOT_MAX_VIDEO_FRAMES` and `NANOBOT_VIDEO_FRAME_INTERVAL`.
+- Install FFmpeg on the host to extract and transcribe video audio. Without it, video frame analysis still works and the response explains why audio was skipped.
+
+Uploads are processed from temporary files and removed after inference. The current video implementation samples frames; it is not full-motion temporal understanding.
