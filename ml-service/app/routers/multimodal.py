@@ -1,12 +1,12 @@
 import io
 import os
+import shutil
 import subprocess
 import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import cv2
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
@@ -95,6 +95,8 @@ def _transcribe_audio(data: bytes, suffix: str) -> dict[str, Any]:
 
 
 def _extract_video_frames(data: bytes, suffix: str) -> tuple[list[bytes], dict[str, Any]]:
+    import cv2
+
     suffix = suffix if suffix and len(suffix) <= 10 else ".mp4"
     video_path = None
     capture = None
@@ -114,6 +116,7 @@ def _extract_video_frames(data: bytes, suffix: str) -> tuple[list[bytes], dict[s
             raise ValueError("The video has no readable frames.")
 
         interval = max(1, int((fps or 1) * FRAME_INTERVAL_SECONDS))
+        sampled_indices = []
         for frame_index in range(0, frame_count, interval):
             if len(frames) >= MAX_VIDEO_FRAMES:
                 break
@@ -124,7 +127,7 @@ def _extract_video_frames(data: bytes, suffix: str) -> tuple[list[bytes], dict[s
             ok, encoded = cv2.imencode(".jpg", frame)
             if ok:
                 frames.append(encoded.tobytes())
-
+                sampled_indices.append(frame_index)
         if not frames:
             raise ValueError("No frames could be extracted from the video.")
         return frames, {
@@ -132,7 +135,7 @@ def _extract_video_frames(data: bytes, suffix: str) -> tuple[list[bytes], dict[s
             "fps": round(fps, 2),
             "frame_count": frame_count,
             "frames_analyzed": len(frames),
-            "sampling_interval_seconds": FRAME_INTERVAL_SECONDS,
+            "frame_timestamps_seconds": [round(i / fps, 2) if fps > 0 else 0 for i in sampled_indices],
         }
     finally:
         if capture is not None:
@@ -141,12 +144,51 @@ def _extract_video_frames(data: bytes, suffix: str) -> tuple[list[bytes], dict[s
             os.remove(video_path)
 
 
+def _transcribe_video_audio(data: bytes, suffix: str) -> dict[str, Any]:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return {"processed": False, "reason": "FFmpeg is not installed; video audio extraction is unavailable."}
+
+    video_path = audio_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix or ".mp4", delete=False) as video_file:
+            video_file.write(data)
+            video_path = video_file.name
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as audio_file:
+            audio_path = audio_file.name
+
+        completed = subprocess.run(
+            [ffmpeg, "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", "16000", audio_path],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+        if completed.returncode != 0 or not os.path.getsize(audio_path):
+            return {"processed": False, "reason": "No decodable audio track was found in this video."}
+
+        result = _transcribe_audio(Path(audio_path).read_bytes(), ".wav")
+        return {"processed": True, **result}
+    except RuntimeError as exc:
+        return {"processed": False, "reason": str(exc)}
+    except subprocess.TimeoutExpired:
+        return {"processed": False, "reason": "Audio extraction exceeded the 180-second processing limit."}
+    finally:
+        for path in (video_path, audio_path):
+            if path and os.path.exists(path):
+                os.remove(path)
+
+
 @router.get("/health")
 async def multimodal_health():
     return {
         "audio": {"available": True, "model_loaded": _speech_model.cache_info().currsize > 0},
         "image": {"available": True, "model_loaded": _image_captioner.cache_info().currsize > 0},
-        "video": {"available": True, "max_frames_per_request": MAX_VIDEO_FRAMES},
+        "video": {
+            "available": True,
+            "ffmpeg_available": shutil.which("ffmpeg") is not None,
+            "max_frames_per_request": MAX_VIDEO_FRAMES,
+        },
         "note": "Models load on first request; first inference may download model weights.",
     }
 
@@ -184,20 +226,17 @@ async def analyze_video(file: UploadFile = File(...)):
     try:
         frames, metadata = await run_in_threadpool(_extract_video_frames, data, suffix)
         captions = []
-        for index, frame in enumerate(frames):
+        for timestamp, frame in zip(metadata["frame_timestamps_seconds"], frames):
             result = await run_in_threadpool(_caption_image, frame)
-            timestamp = round(index * FRAME_INTERVAL_SECONDS, 2)
             captions.append({"timestamp_seconds": timestamp, "caption": result["caption"]})
+        audio_result = await run_in_threadpool(_transcribe_video_audio, data, suffix)
         return {
             "media_type": "video",
             **metadata,
             "frame_summaries": captions,
             "summary": " ".join(item["caption"] for item in captions if item["caption"]),
             "model": os.getenv("NANOBOT_IMAGE_MODEL", "Salesforce/blip-image-captioning-base"),
-            "audio_track": {
-                "processed": False,
-                "reason": "Video audio-track extraction is not enabled in this endpoint yet. Upload the audio track to /audio/transcribe.",
-            },
+            "audio_track": audio_result,
         }
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
