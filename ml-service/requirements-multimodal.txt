@@ -1,0 +1,5 @@
+# Optional multimodal model dependencies.
+# Install after the base requirements: pip install -r requirements-multimodal.txt
+faster-whisper>=1.1.0
+transformers>=4.45.0
+opencv-python-headless>=4.10.0
