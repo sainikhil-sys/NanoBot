@@ -14,12 +14,15 @@ from app.pipelines.data_pipeline import DataPipeline
 from app.pipelines.code_pipeline import CodePipeline
 from app.pipelines.research_pipeline import ResearchPipeline
 from app.pipelines.study_pipeline import StudyPipeline
+from app.routers.multimodal import router as multimodal_router
 
 app = FastAPI(
     title="NanoBot ML Processing Service",
-    description="Deterministic Deep-Learning Execution Layer",
-    version="1.0.0"
+    description="Deep-Learning and Multimodal Processing Execution Layer",
+    version="1.1.0"
 )
+
+app.include_router(multimodal_router, prefix="/multimodal", tags=["Multimodal"])
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,7 +68,10 @@ async def health_check():
             "data_pipeline",
             "code_pipeline",
             "research_pipeline",
-            "study_pipeline"
+            "study_pipeline",
+            "multimodal_audio",
+            "multimodal_image",
+            "multimodal_video"
         ]
     }
 
